@@ -2,3 +2,5 @@ __pycache__
 *.pickle
 ansi_4bit_lookup
 ansi_8bit_lookup
+*mynotes*
+.DS_Store

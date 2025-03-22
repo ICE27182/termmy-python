@@ -1,4 +1,4 @@
-
+ 
 
 from .type_aliases import RGB, RGBA, Pos, Pixel
 from .argument_checking import validate_width, validate_height
