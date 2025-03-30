@@ -1,2 +1,2 @@
 from termmy.core import Color, Vec2i
-from termmy.frame_buffers import FrameBuffer24
+from termmy.frame_buffers import FrameBuffer
