@@ -1,7 +1,8 @@
 
 from __future__ import annotations
 
-from termmy.core import Vec2i, Color, UV
+from termmy.core import Vec2i
+from termmy.colors import Color
 from .msaa_patterns import MSAAPattern, MSAAoff, MSAAx2, MSAAx4, MSAAx8, MSAAx16
 from .text_tag import TextTag
 from typing import overload
@@ -11,13 +12,21 @@ from abc import ABC, abstractmethod
 # DEBUG only used for debugging
 _text_tags: list[TextTag] = []
 
-class FrameBufferBase(ABC):
+class Buffer2D(ABC):
 
     def __init__(self, width: int, height: int):
+        if not isinstance(width, int):
+            raise TypeError(f"`width` must be an int. Got {type(width)}.")
+        if not isinstance(height, int): 
+            raise TypeError(f"`height` must be an int. Got {type(height)}.")
+        if width <= 0:
+            raise ValueError(f"`width` must be greater than 0. Got {width}.")
+        if height <= 0:
+            raise ValueError(f"`height` must be greater than 0. Got {height}.")
         self.width:int
         self.height:int
 
-    def clear(self) -> FrameBufferBase:
+    def clear(self) -> Buffer2D:
         """
         Clear the frame buffer.
         """
@@ -26,7 +35,7 @@ class FrameBufferBase(ABC):
                 self.set_color(x, y, Color(0, 0, 0, 0))
         return self
     
-    def fill(self, color: Color | None = None) -> FrameBufferBase:
+    def fill(self, color: Color | None = None) -> Buffer2D:
         """
         Fill the frame buffer with `color`.
 
@@ -44,22 +53,48 @@ class FrameBufferBase(ABC):
         Return a new Color object at (x, y).
 
         The return value is not a reference to the pixel stored in the buffer.
+
+        Non-color derived classes should return a Color based on class 
+        specific rules.
         """
     
     @abstractmethod
-    def set_color(self, x:int, y:int, color: Color) -> FrameBufferBase:
+    def set_color(self, x:int, y:int, color: Color) -> Buffer2D:
         """
         Set the given color at (x, y). 
         
         The color will not be a reference to the argument.
+
+        Non-color derived classes should should set its value(s) based on
+        class specific rules.
         """
     
     @abstractmethod
-    def add_color(self, x:int, y:int, color: Color) -> FrameBufferBase:
+    def add_color(self, x:int, y:int, color: Color) -> Buffer2D:
         """
         Add the given color to the color at (x, y) with transparency.
+
+        Non-color derived classes should should set its value(s) based on
+        class specific rules.
         """
     
+    @abstractmethod
+    def get(self, x: int, y: int) -> object:
+        """
+        Return a new object at (x, y).
+
+        The returned value is not a reference to the pixel stored in the 
+        buffer.
+        """
+    
+    @abstractmethod
+    def set(self, x: int, y: int, value: object) -> Buffer2D:
+        """
+        Set the given value at (x, y). 
+        
+        The value at (x, y) will not be a reference to the argument.
+        """
+
     @overload
     def ansi_24(self) -> str: ...
     @overload
@@ -294,9 +329,10 @@ class FrameBufferBase(ABC):
             self.add_color(x_left, y, composed_color_left)
             self.add_color(x_right, y, composed_color_right)
 
-    def __add__(self, other: FrameBufferBase) -> FrameBufferBase:
+    def __iadd__(self, other: Buffer2D) -> Buffer2D:
         """
-        Add the color of each pixel in the two frame buffers.
+        Add the color of each pixel of another buffer to the current buffer.
+        The two buffers must have the same dimensions.
         """
         if self.width != other.width or self.height != other.height:
             raise ValueError("Frame buffer dimensions do not match.")

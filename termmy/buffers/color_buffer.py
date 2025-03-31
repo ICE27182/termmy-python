@@ -1,15 +1,16 @@
 
 
-from termmy.core import Color
-from .frame_buffer_base import FrameBufferBase
+from termmy.colors import Color
+from .buffer2d import Buffer2D
 from .text_tag import TextTag
 
 from typing import override, overload
 from collections.abc import Iterable
+from copy import copy
 from itertools import islice
 
 
-class FrameBuffer(FrameBufferBase):
+class ColorBuffer(Buffer2D):
     __slots__ = ("width", "height", "data", "format_str")
     channel_num = 3
     def __init__(self, width: int, height: int,
@@ -30,7 +31,7 @@ class FrameBuffer(FrameBufferBase):
             color.b = 0
 
     @override
-    def fill(self, color: Color | None = None) -> FrameBufferBase:
+    def fill(self, color: Color | None = None) -> Buffer2D:
         """
         Fill the frame buffer with `color`.
 
@@ -54,32 +55,67 @@ class FrameBuffer(FrameBufferBase):
         Return a new Color object at (x, y).
 
         The return value is not a reference to the pixel stored in the buffer.
+
+        Performs bounds checking.
         """
-        return self.data[y*self.width + x]
+        return self.get(x, y)
 
     @override
-    def set_color(self, x:int, y:int, color: Color) -> FrameBufferBase:
+    def set_color(self, x:int, y:int, color: Color) -> Buffer2D:
         """
         Set the given color at (x, y). 
         
         The color will not be a reference to the argument.
+
+        Performs bounds checking.
         """
-        old_color = self.data[y*self.width + x]
-        old_color.r = color.r
-        old_color.g = color.g
-        old_color.b = color.b
-        old_color.a = color.a
-        return self
+        return self.set(x, y, color)
 
     @override
-    def add_color(self, x:int, y:int, color: Color) -> FrameBufferBase:
+    def add_color(self, x:int, y:int, color: Color) -> Buffer2D:
         """
-        Set the given color at (x, y). 
+        Add the given color to (x, y). 
         
         The color will not be a reference to the argument.
+
+        Performs bounds checking.
         """
+        if not (0 <= x < self.width and 0 <= y < self.height):
+            raise IndexError("x or y out of bounds. "
+                             f"Expected 0 <= x < {self.width} and 0 <= y < {self.height}, "
+                             f"but got x={x}, y={y}.")
         base_color = self.data[y*self.width + x]
         base_color += color
+        return self
+    
+    @override
+    def get(self, x:int, y:int) -> Color:
+        """
+        Get the color at (x, y). 
+        
+        Performs bounds checking.
+        """
+        if not (0 <= x < self.width and 0 <= y < self.height):
+            raise IndexError("x or y out of bounds. "
+                             f"Expected 0 <= x < {self.width} and 0 <= y < {self.height}, "
+                             f"but got x={x}, y={y}.")
+        return copy(self.data[y*self.width + x])
+    
+    @override
+    def set(self, x:int, y:int, color: Color) -> Buffer2D:
+        """
+        Set the color at (x, y). 
+        
+        Performs bounds checking.
+        """
+        if not (0 <= x < self.width and 0 <= y < self.height):
+            raise IndexError("x or y out of bounds. "
+                             f"Expected 0 <= x < {self.width} and 0 <= y < {self.height}, "
+                             f"but got x={x}, y={y}.")
+        base_color = self.data[y*self.width + x]
+        base_color.r = color.r
+        base_color.g = color.g
+        base_color.b = color.b
         return self
 
     @override

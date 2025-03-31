@@ -1,6 +1,7 @@
 
 
-from termmy.core import Color, Vec2i
+from termmy.core import Vec2i
+from termmy.colors import Color
 from typing import Self
 from collections.abc import Iterable
 from math import ceil

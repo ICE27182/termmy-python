@@ -5,7 +5,7 @@ from .text_tag import TextTag
 from .settings import Settings, DisplaySetting
 
 
-from .frame_buffers import *
+from .buffers import *
 from .images import *
 from .core import *
 
