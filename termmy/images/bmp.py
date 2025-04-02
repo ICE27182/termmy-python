@@ -6,6 +6,7 @@ from termmy.colors import Color
 from struct import Struct
 from typing import ByteString
 from enum import IntEnum
+from math import ceil
 
 class DIBHeader(IntEnum):
     BITMAPCOREHEADER = 12
@@ -115,13 +116,13 @@ def _decode_pixel_array(byte_string: memoryview, metadata: dict,
                         width: int, height: int, color_depth: int,
                         color_buffer: ColorBuffer) -> None:
     starting = metadata["BmpStartingAddress"]
-    actual_row_width, padding = divmod(color_depth*width, 8)
-    row_width = actual_row_width + 1 if padding else actual_row_width
+    row_width_padded = ceil(color_depth * width / 32) * 4
+    actual_row_width = color_depth * width // 8
     if color_depth == 24:
         for y in range(height):
             row = BMP_24B.iter_unpack(
-                byte_string[starting+y*row_width
-                            :starting+actual_row_width+y*row_width],
+                byte_string[starting+y*row_width_padded
+                            :starting+actual_row_width+y*row_width_padded],
             )
             row_starting_index = (height - 1 - y) * width
             for i, (b, g, r) in enumerate(row):
@@ -132,8 +133,8 @@ def _decode_pixel_array(byte_string: memoryview, metadata: dict,
     elif color_depth == 32:
         for y in range(height):
             row = BMP_32B.iter_unpack(
-                byte_string[starting+y*row_width
-                            :starting+actual_row_width+y*row_width],
+                byte_string[starting+y*row_width_padded
+                            :starting+actual_row_width+y*row_width_padded],
             )
             row_starting_index = (height - 1 - y) * width
             for i, (b, g, r, a) in enumerate(row):
