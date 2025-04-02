@@ -8,3 +8,4 @@ tmp.*
 small.bmp
 .vscode
 ignored*
+PaletteLookup_*

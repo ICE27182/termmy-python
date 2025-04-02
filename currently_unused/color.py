@@ -1,7 +1,7 @@
 
 
 from .constants import DEFAULT_ALPHA, BOX_SIZE
-from .progress_bar import process_bar
+from .core.progress_bar import process_bar
 from .type_aliases import Pixel, RGB
 
 from math import ceil, dist

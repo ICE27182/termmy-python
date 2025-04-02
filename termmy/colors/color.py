@@ -1,7 +1,8 @@
 
+
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Self
+from typing import Self, Callable
 
 @dataclass(slots=True)
 class Color:
@@ -13,6 +14,10 @@ class Color:
     @classmethod
     def from_ints(cls, r: int, g: int, b: int, a: int = 255) -> Color:
         return cls(r/255, g/255, b/255, a/255)
+    
+    @classmethod
+    def from_illuminance(cls, illum: float, alpha: float = 1.0) -> Color:
+        return cls(illum, illum, illum, alpha)
     
     def __add__(self, other: Self) -> Self:
         a = other.a
@@ -35,7 +40,7 @@ class Color:
     def illuminance(self) -> float:
         return self.r*0.299 + self.g*0.587 + self.b*0.114
     
-    def to24(self) -> tuple[int, int, int]:
+    def to24bit(self) -> tuple[int, int, int]:
         return (
             (round(self.r*255.0) if self.r >= 0.0 else 0)
             if self.r <= 1.0 else 255,
@@ -45,7 +50,7 @@ class Color:
             if self.b <= 1.0 else 255,
         )
     
-    def to43(self) -> tuple[int, int, int, int]:
+    def to32bit(self) -> tuple[int, int, int, int]:
         return (
             (round(self.r*255.0) if self.r >= 0.0 else 0)
             if self.r <= 1.0 else 255,
@@ -58,21 +63,26 @@ class Color:
         )
     
     def to_ansi_txt_24(self) -> str:
-        r, g, b = self.to24()
+        r, g, b = self.to24bit()
         return f"\033[38;2;{r};{g};{b}m"
     
     def to_ansi_bgd_24(self) -> str:
-        r, g, b = self.to24()
+        r, g, b = self.to24bit()
         return f"\033[48;2;{r};{g};{b}m"
     
     def to_ansi_txt_color_lookup(self, lookup: bytes | bytearray) -> str:
-        r, g, b = self.to24()
+        r, g, b = self.to24bit()
         return f"\033[38;5;{lookup[(r<<16) + (g<<8) + b]}m"
     
     def to_ansi_bgd_color_lookup(self, lookup: bytes | bytearray) -> str:
-        r, g, b = self.to24()
+        r, g, b = self.to24bit()
         return f"\033[48;5;{lookup[(r<<16) + (g<<8) + b]}m"
     
     def to_ascii(self, lookup: str) -> str:
         return lookup[int(len(lookup) * self.illuminance())]
+    
+    def map(self, func: Callable[[float], float]) -> Color:
+        self.r = func(self.r)
+        self.g = func(self.g)
+        self.b = func(self.b)
     
