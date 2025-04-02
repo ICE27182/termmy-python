@@ -12,7 +12,6 @@ from itertools import islice
 
 class ColorBuffer(Buffer2D):
     __slots__ = ("width", "height", "data", "format_str")
-    channel_num = 3
     def __init__(self, width: int, height: int,
                  data: tuple[Color, ...]|None = None):
         """
