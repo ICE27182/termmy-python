@@ -6,3 +6,4 @@ ansi_8bit_lookup
 .DS_Store
 tmp.*
 small.bmp
+.vscode
