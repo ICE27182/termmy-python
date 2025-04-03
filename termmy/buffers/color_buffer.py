@@ -1,13 +1,17 @@
 
 
+from __future__ import annotations
 from termmy.colors import Color
 from .buffer2d import Buffer2D
 from .text_tag import TextTag
 
-from typing import override, overload
+from typing import override, overload, TYPE_CHECKING
 from collections.abc import Iterable
 from copy import copy
 from itertools import islice
+
+if TYPE_CHECKING:
+    from termmy.display import DisplaySettings
 
 
 class ColorBuffer(Buffer2D):
@@ -21,6 +25,11 @@ class ColorBuffer(Buffer2D):
         self.height = height
         self.data = data or tuple(Color() for _ in range(width*height))
         self.format_str = ("\033[48;2;%d;%d;%dm  " * width) + "\033[0m\n"
+
+    @classmethod
+    def from_display_settings(cls, display_settings: DisplaySettings) -> ColorBuffer:
+        return cls(width=display_settings.width, 
+                   height=display_settings.height)
 
     @override
     def clear(self) -> None:

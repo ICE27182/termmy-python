@@ -85,4 +85,5 @@ class Color:
         self.r = func(self.r)
         self.g = func(self.g)
         self.b = func(self.b)
+        return self
     
