@@ -8,8 +8,7 @@ from termmy.buffers.msaa_patterns import *
 
 from dataclasses import dataclass
 from enum import StrEnum, auto
-from os import getenv, PathLike
-from os.path import exists
+from os import getenv
 from sys import platform
 from shutil import get_terminal_size
 
@@ -50,6 +49,28 @@ class DisplaySettings:
     height: int = None
     resize_mode: ResizeMode = ResizeMode.AsIs
     multisampling: MSAAPattern = MSAAx4
+    gamma_reciprocal: float = 1.0
+    inverse: bool = False
+
+    @property
+    def gamma(self) -> float:
+        """
+        Return the gamma value.
+        """
+        return 1.0 / self.gamma_reciprocal
+    @gamma.setter
+    def gamma(self, value: float) -> None:
+        """
+        Set the gamma value.
+        """
+        self.gamma_reciprocal = 1.0 / value
+    
+    @classmethod
+    def from_dict(cls, d: dict) -> DisplaySettings:
+        """
+        Create a new instance of DisplaySettings from a dictionary.
+        """
+        return cls(**d)
 
     @classmethod
     def auto_detecting(cls,
@@ -172,6 +193,6 @@ class DisplaySettings:
         """
         raise NotImplementedError("Not implemented yet.")
 
-
+    
 
 

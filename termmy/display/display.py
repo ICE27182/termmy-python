@@ -8,305 +8,173 @@ from termmy.buffers.msaa_patterns import *
 from typing import Any, overload, Callable
 
 @overload
-def display(frame_buffer: Buffer2D): ...
+def display(frame_buffer: Buffer2D) -> None: ...
 @overload
-def display(frame_buffer: Buffer2D,
-            color_settings: DisplaySettings = DisplaySettings.auto_detecting(),
-            go_back_to_top: bool = False,
-            color_map: Callable[[float], float] | None = None): ...
+def display(
+    frame_buffer: Buffer2D,
+    color_settings: DisplaySettings = DisplaySettings.auto_detecting(),
+    go_back_to_top: bool = False,
+    tone_mapping: Callable[[float], float] | None = None
+) -> None: ...
 
 def display(
     buffer: Buffer2D, 
     display_settings:DisplaySettings = DisplaySettings.auto_detecting(),
     go_back_to_top: bool = False,
-    color_map: Callable[[float], float] | None = None,
+    tone_mapping: Callable[[float], float] | None = None,
 ) -> None:
     """
-    `color_map` must be function mapping from [0, 1] -> [0, 1], 
-    or IndexError may raise or the displayed image may not look as expected.
+    `tone_mapping` must be function mapping from [0, 1] -> [0, 1], 
+    or IndexError or TypeError may raise
+    or the displayed image may not look as expected.
     """
-    quantizer = display_settings.quantizer
     resize_mode = display_settings.resize_mode
+    multisampling = MSAAoff
+    horizontal_scalar, vertical_scalar = 1.0, 1.0
     display_width = display_settings.width
     display_height = display_settings.height
-    if not color_map and _ansi_24(buffer, quantizer, resize_mode, 
-                                  display_settings.width,
-                                  display_settings.height, 
-                                  go_back_to_top):
-        return
-    if resize_mode == ResizeMode.AsIs:
-        _color_cropped(buffer=buffer, 
-                       quantizer=quantizer, 
-                       range_of_x=range(buffer.width), 
-                       range_of_y=range(buffer.height), 
-                       go_back_to_top=go_back_to_top,
-                       color_map=color_map)
-    elif resize_mode == ResizeMode.CropRight:
-        _color_cropped(buffer=buffer, 
-                       quantizer=quantizer, 
-                       range_of_x=range(buffer.width 
-                                        if buffer.width <= display_width
-                                        else display_width), 
-                       range_of_y=range(buffer.height), 
-                       go_back_to_top=go_back_to_top)
+    inverse = display_settings.inverse
+    gamma_reciprocal = display_settings.gamma_reciprocal
+    quantizer = display_settings.quantizer
+    buffer_width, buffer_height = buffer.width, buffer.height
+    if resize_mode == ResizeMode.CropRight:
+        range_of_x = range(display_width if display_width < buffer_width 
+                           else buffer_width)
+        range_of_y = range(buffer_height)
     elif resize_mode == ResizeMode.CropRightBottom:
-        _color_cropped(buffer=buffer, 
-                       quantizer=quantizer, 
-                       range_of_x=range(buffer.width 
-                                        if buffer.width <= display_width
-                                        else display_width), 
-                       range_of_y=range(buffer.height 
-                                        if buffer.height <= display_height
-                                        else display_height), 
-                       go_back_to_top=go_back_to_top,
-                       color_map=color_map)
+        range_of_x = range(display_width if display_width < buffer_width 
+                           else buffer_width)
+        range_of_y = range(display_height if display_height < buffer_height
+                           else buffer_height)
     elif resize_mode == ResizeMode.CropHorizontalCentered:
-        half_width_diff = (display_width-buffer.width) / 2
+        half_width_diff = (display_width-buffer_width) / 2
         if half_width_diff >= 0:
-            range_of_x = range(buffer.width)
+            range_of_x = range(buffer_width)
         else:
             range_of_x = range(round(-half_width_diff), 
-                            round(buffer.width + half_width_diff))
-        _color_cropped(buffer=buffer, 
-                       quantizer=quantizer, 
-                       range_of_x=range_of_x, 
-                       range_of_y=range(buffer.height), 
-                       go_back_to_top=go_back_to_top,
-                       color_map=color_map)
+                               round(buffer_width + half_width_diff))
+        range_of_y = range(buffer_height)
     elif resize_mode == ResizeMode.CropCentered:
-        half_width_diff = (display_width-buffer.width) / 2
+        half_width_diff = (display_width-buffer_width) / 2
         if half_width_diff >= 0:
-            range_of_x = range(buffer.width)
+            range_of_x = range(buffer_width)
         else:
             range_of_x = range(round(-half_width_diff), 
-                            round(buffer.width + half_width_diff))
-        half_height_diff = (display_height-buffer.height) / 2
+                               round(buffer_width + half_width_diff))
+        half_height_diff = (display_height-buffer_height) / 2
         if half_height_diff >= 0:
-            range_of_y = range(buffer.height)
+            range_of_y = range(buffer_height)
         else:
             range_of_y = range(round(-half_height_diff), 
-                            round(buffer.height + half_height_diff))
-        _color_cropped(buffer=buffer, 
-                       quantizer=quantizer, 
-                       range_of_x=range_of_x, 
-                       range_of_y=range_of_y, 
-                       go_back_to_top=go_back_to_top,
-                       color_map=color_map)
+                               round(buffer_height + half_height_diff))
     elif resize_mode == ResizeMode.Stretch:
-        _color_scaled(buffer=buffer,
-                      quantizer=quantizer,
-                      display_width=display_width,
-                      display_height=display_height,
-                      horizontal_scalar=buffer.width/display_width,
-                      vertical_scalar=buffer.height/display_height,
-                      go_back_to_top=go_back_to_top,
-                      multi_sampling=display_settings.multisampling,
-                      color_map=color_map)
+        range_of_x = range(display_width)
+        range_of_y = range(display_height)
+        horizontal_scalar=buffer_width/display_width
+        vertical_scalar=buffer_height/display_height
+        multisampling = display_settings.multisampling
     elif resize_mode == ResizeMode.Fit:
         display_aspect_ratio = display_width / display_height
-        buffer_aspect_ratio = buffer.width / buffer.height
+        buffer_aspect_ratio = buffer_width / buffer_height
         # Change horizontally
         if buffer_aspect_ratio >= display_aspect_ratio:
-            horizontal_scalar = buffer.width / display_width
+            horizontal_scalar = buffer_width / display_width
             vertical_scalar = horizontal_scalar
         # Change vertically
         else:
-            vertical_scalar = buffer.height / display_height
+            vertical_scalar = buffer_height / display_height
             horizontal_scalar = vertical_scalar
-
-        _color_scaled(buffer=buffer,
-                      quantizer=quantizer,
-                      display_width=display_width,
-                      display_height=display_height,
-                      horizontal_scalar=horizontal_scalar,
-                      vertical_scalar=vertical_scalar,
-                      go_back_to_top=go_back_to_top,
-                      multi_sampling=display_settings.multisampling,
-                      color_map=color_map)
+        multisampling = display_settings.multisampling
+        candidate_display_width = int(buffer.width / horizontal_scalar)
+        candidate_display_height = int(buffer.height / vertical_scalar)
+        if candidate_display_width < display_width:
+            display_width = candidate_display_width
+        if candidate_display_height < display_height:
+            display_height = candidate_display_height
+        range_of_x = range(display_width)
+        range_of_y = range(display_height)
+    elif resize_mode == ResizeMode.AsIs:
+        range_of_x = range(buffer_width)
+        range_of_y = range(buffer_height)
     else:
-        raise NotImplementedError(f"Resize mode '{resize_mode}' "
-                                  "is not supported yet.")
+        raise NotImplementedError(f"Resize mode `{resize_mode}` is not supported yet.")
+    format_str = "%s" * (range_of_x.stop - range_of_x.start) + ""
+    print(
+        "\033[0m\n".join(
+            format_str % tuple(
+                _pixel_color(buffer=buffer,
+                             x_display=x_display,
+                             y_display=y_display,
+                             buffer_width=buffer_width,
+                             buffer_height=buffer_height,
+                             gamma_reciprocal=gamma_reciprocal,
+                             inverse=inverse,
+                             quantizer=quantizer,
+                             multisampling=multisampling,
+                             horizontal_scalar=horizontal_scalar,
+                             vertical_scalar=vertical_scalar,
+                             tone_mapping=tone_mapping,
+                             display_settings=display_settings)
+                for x_display in range_of_x
+            )
+            for y_display in range_of_y
+        ),
+        end="\033[0m\n"
+    )
+    if go_back_to_top:
+        print("\033[F" * (range_of_y.stop - range_of_y.start), end="")
 
-
-
-def _ansi_24(buffer: Buffer2D, 
-             quantizer: ColorQuantizer | None,
-             resize_mode: ResizeMode,
-             display_width: int,
-             display_height: int,
-             go_back_to_top: bool) -> bool:
-    """
-    A buffer specifc, potentially more efficient method will be used
-    under correct circumstances.
-
-    Returns True if this method is used and there is no need to fallback to
-    the more general implementations.
-
-    Return False if nothing is done in this function.
-    """
-    use_ansi_24 = False
-    if not quantizer:
-        if resize_mode == ResizeMode.AsIs:
-            use_ansi_24 = True
-        elif buffer.width == display_width:
-            if resize_mode in (ResizeMode.CropRight, 
-                               ResizeMode.CropRightBottom):
-                use_ansi_24 = True
-            elif buffer.height == display_height:
-                use_ansi_24 = True
-    if use_ansi_24:
-        print(buffer.ansi_24())
-        if go_back_to_top:
-            print("\033[F"*(buffer.height + 1), end="")
-    return use_ansi_24
-
-def _color_cropped(buffer: Buffer2D, quantizer: ColorQuantizer | None,
-                   range_of_x: range, range_of_y: range, 
-                   go_back_to_top: bool, 
-                   color_map: Callable[[float], float] | None = None) -> None:
-    # The step will always be 1, 
-    # so there is no need to divide the length by it
-    # It also applies to `row_num`
-    format_str = "%s" * (range_of_x.stop - range_of_x.start)
+def _pixel_color(
+    buffer: Buffer2D,
+    x_display: int, 
+    y_display: int,
+    buffer_width: int,
+    buffer_height: int,
+    gamma_reciprocal: float,
+    inverse: bool,
+    quantizer: ColorQuantizer,
+    multisampling: MSAAPattern,
+    horizontal_scalar: float,
+    vertical_scalar: float,
+    tone_mapping: Callable[[float], float] | None = None,
+    display_settings: DisplaySettings | None = None,
+) -> str:
+    num_samples = 0
+    r, g, b = 0, 0, 0
+    for dx, dy in multisampling:
+        x_buffer_offset = round((x_display + dx) * horizontal_scalar)
+        y_buffer_offset = round((y_display + dy) * vertical_scalar)
+        if (0 <= x_buffer_offset < buffer_width
+            and 0 <= y_buffer_offset < buffer_height):
+            current_color = buffer.get_color(x_buffer_offset, y_buffer_offset)
+            r += current_color.r
+            g += current_color.g
+            b += current_color.b
+            num_samples += 1
+    if num_samples:
+        num_samples_reciprocal = 1 / num_samples
+        current_color = Color(r * num_samples_reciprocal,
+                              g * num_samples_reciprocal,
+                              b * num_samples_reciprocal)
+    # No multisampling or no eligible samples
+    else:
+        current_color: Color = buffer.get_color(
+            int(x_display * horizontal_scalar),
+            int(y_display * vertical_scalar),
+        )
+    if tone_mapping:
+        current_color.r = tone_mapping(current_color.r)
+        current_color.g = tone_mapping(current_color.g)
+        current_color.b = tone_mapping(current_color.b)
+    if gamma_reciprocal != 1.0:
+        current_color.r **= gamma_reciprocal
+        current_color.g **= gamma_reciprocal
+        current_color.b **= gamma_reciprocal
+    if inverse:
+        current_color.r = 1 - current_color.r
+        current_color.g = 1 - current_color.g
+        current_color.b = 1 - current_color.b
     if quantizer:
-        print(
-            "\033[0m\n".join(
-                format_str % tuple(
-                    quantizer.pixel_str(buffer.get_color(x, y))
-                    for x in range_of_x
-                )
-                for y in range_of_y
-            )
-            if not color_map else
-            "\033[0m\n".join(
-                format_str % tuple(
-                    quantizer.pixel_str(buffer.get_color(x, y).map(color_map))
-                    for x in range_of_x
-                )
-                for y in range_of_y
-            )
-        )
+        return quantizer.pixel_str(current_color)
     else:
-        print(
-            "\033[0m\n".join(
-                format_str % tuple(
-                    f"{buffer.get_color(x, y).to_ansi_bgd_24()}  "
-                    for x in range_of_x
-                )
-                for y in range_of_y
-            )
-            if not color_map else
-            "\033[0m\n".join(
-                format_str % tuple(
-                    f"{buffer.get_color(x, y)
-                             .map(color_map)
-                             .to_ansi_bgd_24()}  "
-                    for x in range_of_x
-                )
-                for y in range_of_y
-            )
-        )
-    if go_back_to_top:
-        row_num = range_of_y.stop - range_of_y.start
-        print("\033[F" * (row_num + 1), end = "")
-
-def _color_scaled(buffer: Buffer2D, 
-                  quantizer: ColorQuantizer | None,
-                  display_width: range, 
-                  display_height: range, 
-                  horizontal_scalar: float, 
-                  vertical_scalar: float,
-                  go_back_to_top: bool,
-                  multi_sampling: MSAAPattern,
-                  color_map: Callable[[float], float] | None = None) -> None:
-    """
-    horizontal_scalar * resultin_x = buffer_x
-    """
-    # The logic for checking quantizer is moved into the loops for the
-    # clarity of the code.
-    candidate_display_width = int(buffer.width / horizontal_scalar)
-    candidate_display_height = int(buffer.height / vertical_scalar)
-    if candidate_display_width < display_width:
-        display_width = candidate_display_width
-    if candidate_display_height < display_height:
-        display_height = candidate_display_height
-    format_str = "%s" * display_width
-    if (not multi_sampling 
-        or buffer.width == display_width and buffer.height == display_height):
-        print(
-            "\033[0m\n".join(
-                format_str % tuple(
-                    (
-                        quantizer.pixel_str(
-                            buffer.get_color(int(vertical_scalar * x), 
-                                             int(horizontal_scalar * y))
-                        )
-                        if quantizer else 
-                        f"{buffer.get_color(int(vertical_scalar * x), 
-                                            int(horizontal_scalar * y)
-                           ).to_ansi_bgd_24()}  "
-                    )
-                    for x in range(display_width)
-                )
-                for y in range(display_height)
-            )
-            if not color_map else
-            "\033[0m\n".join(
-                format_str % tuple(
-                    (
-                        quantizer.pixel_str(
-                            buffer.get_color(int(vertical_scalar * x), 
-                                             int(horizontal_scalar * y))
-                                  .map(color_map)
-                        )
-                        if quantizer else 
-                        f"{buffer.get_color(int(vertical_scalar * x), 
-                                            int(horizontal_scalar * y)
-                           ).to_ansi_bgd_24()}  "
-                    )
-                    for x in range(display_width)
-                )
-                for y in range(display_height)
-            )
-        )
-    else:
-        str_buf = []
-        buffer_width, buffer_height = buffer.width, buffer.height
-        for y in range(display_height):
-            for x in range(display_width):
-                current_color = Color(0, 0, 0)
-                sample_num = 0.0
-                for dx, dy in multi_sampling:
-                    buffer_x = round(horizontal_scalar * (x + dx))
-                    buffer_y = round(vertical_scalar * (y + dy))
-                    if (0 <= buffer_x < buffer_width 
-                        and 0 <= buffer_y < buffer_height):
-                        color = buffer.get_color(buffer_x, buffer_y)
-                        current_color.r += color.r
-                        current_color.g += color.g
-                        current_color.b += color.b
-                        sample_num += 1.0
-                if sample_num:
-                    sample_num_reciprocal = 1.0 / sample_num
-                    current_color.r *= sample_num_reciprocal
-                    current_color.g *= sample_num_reciprocal
-                    current_color.b *= sample_num_reciprocal
-                else:
-                    current_color = buffer.get_color(
-                        int(horizontal_scalar * x),
-                        int(vertical_scalar * y),
-                    )
-                if color_map:
-                    current_color.r = color_map(current_color.r)
-                    current_color.g = color_map(current_color.g)
-                    current_color.b = color_map(current_color.b)
-                str_buf.append(
-                    quantizer.pixel_str(current_color)
-                    if quantizer 
-                    else f"{current_color.to_ansi_bgd_24()}  "
-                )
-            str_buf.append("\033[0m\n")
-        print("".join(str_buf))
-
-    if go_back_to_top:
-        print("\033[F" * (display_height + 1), end = "")
+        return "\033[48;2;%d;%d;%dm  " % (current_color.to24bit())

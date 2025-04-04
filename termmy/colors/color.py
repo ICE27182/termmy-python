@@ -41,6 +41,16 @@ class Color:
         return self.r*0.299 + self.g*0.587 + self.b*0.114
     
     def to24bit(self) -> tuple[int, int, int]:
+        """
+        Return a tuple of 3 integers in [0, 255] with clamping, in the order
+        of red, green and blue.
+
+        If the value of a channel is less than 0, the value will be returned
+        as 0.
+
+        If the value of a channel is larger than 1, the value will be returned
+        as 255.
+        """
         return (
             (round(self.r*255.0) if self.r >= 0.0 else 0)
             if self.r <= 1.0 else 255,
@@ -51,6 +61,16 @@ class Color:
         )
     
     def to32bit(self) -> tuple[int, int, int, int]:
+        """
+        Return a tuple of 4 integers in [0, 255] with clamping, in the order
+         of red, green, blue and alpha.
+
+        If the value of a channel is less than 0, the value will be returned
+        as 0.
+        
+        If the value of a channel is larger than 1, the value will be returned
+        as 255.
+        """
         return (
             (round(self.r*255.0) if self.r >= 0.0 else 0)
             if self.r <= 1.0 else 255,
