@@ -1,14 +1,21 @@
+
+
 import sys
 import time
 from enum import StrEnum, auto
 from select import select
 from time import sleep
+from warnings import warn
 
 class GetchType(StrEnum):
     Msvcrt = auto()
     Termios = auto()
     Fallback = auto()
+    
 
+################################################################
+# Windows, msvcrt
+################################################################
 if sys.platform == "win32":
     import msvcrt
     def getch():
@@ -30,20 +37,25 @@ if sys.platform == "win32":
     
 else:
     try:
+        ################################################################
+        # Unix-like, termios + tty
+        ################################################################
         import tty
         import termios
-        
-        termios.tcgetattr(sys.stdin.fileno())
+        _FD = sys.stdin.fileno()
+        _OLD_SETTINGS = termios.tcgetattr(_FD)
+        tty.setraw(_FD)
+        # Since it is possible to get file descriptor and tty attributes
+        # the following two getch implmentation shall work
+        GETCH_TYPE = GetchType.Termios
+
         def getch() -> str:
-            fd = sys.stdin.fileno()
-            old_settings = termios.tcgetattr(fd)
             try:
-                tty.setraw(fd)
+                tty.setraw(_FD)
                 ch = sys.stdin.read(1)
             finally:
-                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                termios.tcsetattr(_FD, termios.TCSADRAIN, _OLD_SETTINGS)
             return ch
-        GETCH_TYPE = GetchType.Termios
 
         def getch_timeout(timeout: float) -> str | None:
             """
@@ -53,18 +65,24 @@ else:
 
             May not work with control sequences.
             """
-            fd = sys.stdin.fileno()
-            old_settings = termios.tcgetattr(fd)
             try:
-                tty.setraw(fd)
+                tty.setraw(_FD)
                 rlist, _, _ = select([sys.stdin], [], [], timeout)
                 if rlist:
                     return sys.stdin.read(1)
                 return None
             finally:
-                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                termios.tcsetattr(_FD, termios.TCSADRAIN, _OLD_SETTINGS)
+
     except (ImportError, termios.error):
+        ################################################################
+        # Fallback to builtin function input
+        ################################################################
         GETCH_TYPE = GetchType.Fallback
+        warn("This platform does not support direct key reading. "
+             "getch fallbacks to the builtin function input. "
+             "getch_timeout is not available "
+             "and will raise a NotImplementedError if called.")
         # Fallback: no proper timeout implementation; simply use input().
         def getch() -> str:
             return input()
@@ -72,6 +90,8 @@ else:
             # Timeout not supported; immediately call getch.
             raise NotImplementedError("getch_timeout is not supported "
                                       "on this platform")
+
+
 
 if __name__ == "__main__":
     print("Press a key (waiting up to 2 seconds):")
@@ -88,3 +108,4 @@ if __name__ == "__main__":
             print(repr(char))
         else:
             print("\n\n\n")
+    

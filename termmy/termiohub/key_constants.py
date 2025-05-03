@@ -299,6 +299,10 @@ MSVCRT_KEY_MAPPING = {
     "\xe0\x86": F12_MSVCRT,       
 }
 
+FALLBACK_KEY_MAPPING = {
+    "": Key("Enter", ""),
+}
+
 ASCII_MAPPING = {
     "`": BACKTICK_KEY,
     "1": ONE_KEY,

@@ -10,7 +10,7 @@ from .buffers import *
 from .display import *
 from .colors import *
 from .images import *
-from .keyboard import *
+from .termiohub import *
 
 # def display_frame(frame:Frame24, display_settings:int|Settings):
 #     pass

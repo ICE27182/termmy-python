@@ -4,6 +4,7 @@ from .display_settings import DisplaySettings, ColorMode, ResizeMode
 from termmy.colors import Color, ColorQuantizer
 from termmy.buffers import Buffer2D
 from termmy.buffers.msaa_patterns import *
+from termmy.termiohub import safe_print
 
 from typing import Any, overload, Callable
 
@@ -99,7 +100,10 @@ def display(
     else:
         raise NotImplementedError(f"Resize mode `{resize_mode}` is not supported yet.")
     format_str = "%s" * (range_of_x.stop - range_of_x.start) + ""
-    print(
+    # go_back_to_top is 0 when it is false
+    row_num_going_back = go_back_to_top * (range_of_y.stop-range_of_y.start)
+    safe_print(
+        "\033[?25l" +
         "\033[0m\n".join(
             format_str % tuple(
                 _pixel_color(buffer=buffer,
@@ -119,10 +123,8 @@ def display(
             )
             for y_display in range_of_y
         ),
-        end="\033[0m\n"
+        end=f"\033[0m\n{row_num_going_back * "\033[F"}\033[?25h"
     )
-    if go_back_to_top:
-        print("\033[F" * (range_of_y.stop - range_of_y.start), end="")
 
 def _pixel_color(
     buffer: Buffer2D,

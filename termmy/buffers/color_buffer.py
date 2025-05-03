@@ -47,9 +47,7 @@ class ColorBuffer(Buffer2D):
         """
         color = color or Color(1.0, 1.0, 1.0, 1.0)
         for pixel_color in self.data:
-            pixel_color.r = color.r
-            pixel_color.g = color.g
-            pixel_color.b = color.b
+            pixel_color += color
         return self
 
     @overload
