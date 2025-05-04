@@ -6,6 +6,15 @@ from time import sleep
 from random import random
 from collections import deque
 
+def clear():
+    from os import system
+    import sys
+    if sys.platform == "win32":
+        system("cls")
+    else:
+        system("clear")
+
+
 WIDTH = 80
 HEIGHT = 60
 ICE = Color.from_ints(156, 220, 255, 127)
@@ -13,10 +22,10 @@ ICE = Color.from_ints(156, 220, 255, 127)
 display_settings = DisplaySettings.auto_detecting(ensure_lookup_exsits=True)
 # display_settings.inverse = True
 frame_buf = ColorBuffer(WIDTH, HEIGHT)
-frame_buf = ColorBuffer.from_display_settings(display_settings)
+# frame_buf = ColorBuffer.from_display_settings(display_settings)
 # display_settings.multisampling = MSAAoff
 # display_settings.set_color_mode(ColorMode.ANSI256)
-# display_settings.resize_mode = ResizeMode.AsIs
+display_settings.resize_mode = ResizeMode.AsIs
 
 safe_print(display_settings)
 
@@ -38,57 +47,81 @@ current_color = ICE
 pos = Vec2i(WIDTH // 2, HEIGHT // 2)
 line = deque([copy(pos), copy(pos)], maxlen=2)
 triangle = deque([copy(pos), copy(pos), copy(pos)], maxlen=3)
-while True:
+recording = None
+clear()
+with read_keyboard():
+    while True:
+        # frame_buf.fill(Color(random()*0.95, random(), random(), 0.01))
+        key = get_key()
+        if key:
+            if key.match("escape"):
+                safe_print("Exiting")
+                sleep(0.5)
+                break
+            elif key.match("F"):
+                frame_buf.fill()
+            elif key.match("f"):
+                frame_buf.fill(current_color)
 
-    frame_buf.fill(Color(random()*0.95, random(), random(), 0.01))
-    key = get_key()
-    if key:
-        if key.match("escape"):
-            safe_print("Exiting")
-            sleep(1)
-            break
-        elif key.match("F"):
-            frame_buf.fill()
-        elif key.match("f"):
-            frame_buf.fill(current_color)
+            elif key.match("R"):
+                current_color = ICE
+            elif key.match("r"):
+                current_color = Color(random(), random(), random(), random())
+            
+            elif key.match(" "):
+                default()
+                pos = Vec2i(WIDTH // 2, HEIGHT // 2)
 
-        elif key.match("R"):
-            current_color = ICE
-        elif key.match("r"):
-            current_color = Color(random(), random(), random(), random())
+            elif key.match("up"):
+                frame_buf.set_color(pos.x, pos.y, current_color)
+                pos.y = (pos.y - 1) % HEIGHT
+                frame_buf.set_color(pos.x, pos.y, ICE)
+            elif key.match("down"):
+                frame_buf.set_color(pos.x, pos.y, current_color)
+                pos.y = (pos.y + 1) % HEIGHT
+                frame_buf.set_color(pos.x, pos.y, ICE)
+            elif key.match("left"):
+                frame_buf.set_color(pos.x, pos.y, current_color)
+                pos.x = (pos.x - 1) % WIDTH
+                frame_buf.set_color(pos.x, pos.y, ICE)
+            elif key.match("right"):
+                frame_buf.set_color(pos.x, pos.y, current_color)
+                pos.x = (pos.x + 1) % WIDTH
+                frame_buf.set_color(pos.x, pos.y, ICE)
+
+            elif key.match("l"):
+                line.append(copy(pos))
+                frame_buf.set_color(pos.x, pos.y, Color(1, 0, 0, 1))
+            elif key.match("L"):
+                frame_buf.draw_line(line[0], line[1], Color(0,0,0,1))
+            
+            elif key.match("t"):
+                triangle.append(copy(pos))
+                frame_buf.set_color(pos.x, pos.y, Color(1, 0, 0, 1))
+            elif key.match("T"):
+                frame_buf.draw_triangle(triangle[0], triangle[1], triangle[2], True)
+            
+            elif key.match("f7"):
+                if is_recording():
+                    recording = end_recording(
+                        len(F7_MSVCRT.code) if GETCH_TYPE == GetchType.Msvcrt
+                        else len(F7_TERMIOS.code)
+                    )
+                else:
+                    start_recording()
+            elif key.match("f8"):
+                if recording:
+                    replay(recording)
+            elif key.match("f10"):
+                with safe_io():
+                    print(f"{is_recording()=}")
+                    print(recording)
+                    print(g_key_buffer)
+                    print(f"{g_io_lock.locked()=}")
+                    getch()
         
-        elif key.match(" "):
-            default()
-
-        elif key.match("up"):
-            frame_buf.set_color(pos.x, pos.y, current_color)
-            pos.y = (pos.y - 1) % HEIGHT
-            frame_buf.set_color(pos.x, pos.y, ICE)
-        elif key.match("down"):
-            frame_buf.set_color(pos.x, pos.y, current_color)
-            pos.y = (pos.y + 1) % HEIGHT
-            frame_buf.set_color(pos.x, pos.y, ICE)
-        elif key.match("left"):
-            frame_buf.set_color(pos.x, pos.y, current_color)
-            pos.x = (pos.x - 1) % WIDTH
-            frame_buf.set_color(pos.x, pos.y, ICE)
-        elif key.match("right"):
-            frame_buf.set_color(pos.x, pos.y, current_color)
-            pos.x = (pos.x + 1) % WIDTH
-            frame_buf.set_color(pos.x, pos.y, ICE)
-
-        elif key.match("l"):
-            line.append(copy(pos))
-            frame_buf.set_color(pos.x, pos.y, Color(1, 0, 0, 1))
-        elif key.match("L"):
-            frame_buf.draw_line(line[0], line[1], Color(0,0,0,1))
-        
-        elif key.match("t"):
-            triangle.append(copy(pos))
-            frame_buf.set_color(pos.x, pos.y, Color(1, 0, 0, 1))
-        elif key.match("T"):
-            frame_buf.draw_triangle(triangle[0], triangle[1], triangle[2], True)
-
-    display(frame_buf, display_settings, go_back_to_top=True)
-
-restore_terminal()
+        if True:
+            display(frame_buf, display_settings, go_back_to_top=True)
+        else:
+            with safe_io():
+                print(frame_buf.ansi_24(), end="\033[F"*(HEIGHT))

@@ -19,7 +19,8 @@ class GetchType(StrEnum):
 if sys.platform == "win32":
     import msvcrt
     def getch():
-        return msvcrt.getch().decode("ascii")
+        return msvcrt.getch().decode("latin-1")
+
     GETCH_TYPE = GetchType.Msvcrt
 
     def getch_timeout(timeout: float) -> str:

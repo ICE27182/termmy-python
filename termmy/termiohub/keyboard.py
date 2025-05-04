@@ -1,15 +1,5 @@
 
 
-# _input_buffer: Queue[tuple[str, float]]
-# get_key -> Key | None, get_key_event -> KeyEvent | None
-# update_key_mapping(dict[str, Key]), remove_key_mapping(str)
-# start_recording(max_recorded_keys: int), end_recording -> record
-# start_replaying(recording), stop_replaying
-
-# Recording will be raw input
-# Replay will be implemented by writing to `g_key_buffer`
-#   
-
 from .getch import GetchType, GETCH_TYPE, getch
 from .keys import Key, KeyEvent
 from .key_constants import *
@@ -19,37 +9,8 @@ from time import time, sleep
 from collections import deque
 from threading import Lock, Thread
 from copy import copy
+from contextlib import contextmanager
 
-def restore_terminal() -> None:
-    """
-    Restore the terminal settings from raw mode to the settings it had before
-    this module is imported.
-
-    Add this to your customized signals if there is any to make sure the
-    terminal will not be at raw mode when the program exits.
-
-    It has no effect on windows or platforms that has to use the fallback
-    method for reading keyboard, because on these platforms, the terminal will
-    not be set to raw mode in the first place.
-    """
-    global g_read_keyboard
-    if GETCH_TYPE == GetchType.Termios:
-        g_read_keyboard = False
-        from os import system
-        # system("clear")
-        print("Press enter to exit ...")
-        from .getch import _FD, _OLD_SETTINGS
-        termios.tcsetattr(_FD, termios.TCSADRAIN, _OLD_SETTINGS)
-
-if GETCH_TYPE == GetchType.Termios:
-    import signal, termios, atexit
-    atexit.register(restore_terminal)
-    for sig in [signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT, 
-                signal.SIGTSTP, signal.SIGCONT, signal.SIGABRT]:
-        try:
-            signal.signal(sig, restore_terminal)
-        except (AttributeError, OSError, RuntimeError):
-            pass
 
 g_key_mapping = copy(ASCII_MAPPING)
 if GETCH_TYPE == GetchType.Termios:
@@ -64,19 +25,65 @@ elif GETCH_TYPE == GetchType.Fallback:
 else:
     raise ValueError(f"Unsupported GETCH_TYPE: '{GETCH_TYPE}'")
 
-g_recording: KeyboardRecording | None = None
-
-g_read_keyboard: bool = True
+g_read_keyboard: bool = False
 g_io_lock = Lock()
 
 g_get_key_event_lock = Lock()
 g_key_buffer: deque[tuple[str, float]] = deque()
 
-def get_key_event(key_buffer_timeout: float = 0.5, 
+g_recording: KeyboardRecording | None = None
+
+
+@contextmanager
+def read_keyboard(exit_prompt: str | bool = True):
+    """
+    Context manager to read keyboard input.
+
+    A RuntimeError will be raised if it is used within the 
+    `read_keyboard` context.
+
+    `get_key_event`, `get_key`, `start_recording`, `end_recording` 
+    and `replay`  must be called within the context.
+
+    recording will be stopped when the context exits.
+
+    Generally, you need to press enter to exit the context.
+    It will block until the key is pressed due to internal implementation.
+    You can use `exit_prompt` to setup prompt to acknowledge the user.
+
+    `exit_prompt` can be a string, or a boolean. When the context exits:
+        string -> Prompts the string  
+        True -> Prompts "Press enter to exit ..."
+        False -> no prompt will be printed.
+    """
+    global g_read_keyboard
+    # Check existing context
+    if g_read_keyboard:
+        raise RuntimeError("Already in the context of `read_keyboard`.")
+    # Setup thread
+    keyboard_reading_thread = Thread(target=_read_keyboard, daemon=False)
+    try:
+        g_read_keyboard = True
+        keyboard_reading_thread.start()
+        yield
+    finally:
+        if g_recording:
+            end_recording()
+        g_read_keyboard = False
+        g_key_buffer.clear()
+        if not g_read_keyboard and exit_prompt:
+            if exit_prompt == True:
+                print("Press enter to exit ...")
+            else:
+                print(exit_prompt)
+        keyboard_reading_thread.join()
+
+
+def get_key_event(key_buffer_timeout: float = 0.2, 
                   sequence_timeout: float = 0.05) -> KeyEvent | None:
     """
     Get a key event (key with a timestamp) from the keyboard or the recording
-    currently replaying.
+    currently replaying. It must becalled within the context of `read_keyboard`.
 
     Key presses before key_buffer_timeout will be ignored. 
     Return None if the buffer is empty.
@@ -98,6 +105,10 @@ def get_key_event(key_buffer_timeout: float = 0.5,
     key will have all its modifiers set to Modifirer.Unknown and it will have
     exactly one character for both `name` and `code` attributes.
     """
+    if not g_read_keyboard:
+        raise RuntimeError("`get_key_event` must be called within the context"
+                           " of `read_keyboard`")
+
     with g_get_key_event_lock:
         while g_key_buffer:
             raw_key, timestamp = g_key_buffer.popleft()
@@ -119,10 +130,11 @@ def get_key_event(key_buffer_timeout: float = 0.5,
         else:
             return None
 
-def get_key(key_buffer_timeout: float = 0.5, 
+def get_key(key_buffer_timeout: float = 0.2, 
             sequence_timeout: float = 0.05) -> Key | None:
     """
-    Get a key from the keyboard or the recording currently replaying.
+    Get a key from the keyboard or the recording currently replaying. 
+    It must becalled within the context of `read_keyboard`.
 
     Key presses before key_buffer_timeout will be ignored. 
     Return None if the buffer is empty.
@@ -144,6 +156,9 @@ def get_key(key_buffer_timeout: float = 0.5,
     key will have all its modifiers set to Modifirer.Unknown and it will have
     exactly one character for both `name` and `code` attributes.
     """
+    if not g_read_keyboard:
+        raise RuntimeError("`get_key` must be called within the context"
+                           " of `read_keyboard`")
     key_event: KeyEvent | None = get_key_event(key_buffer_timeout, 
                                                sequence_timeout)
     return key_event.key if key_event else None
@@ -207,16 +222,42 @@ def get_key_mapping_view() -> dict[str, Key]:
     return copy(g_key_mapping)
 
 def start_recording() -> None:
+    """
+    Start recording keyboard events. 
+
+    It must be called within the context of `read_keyboard`.
+
+    Recording will stop when `end_recording` is called or when the context
+    exits.
+    """
+    if not g_read_keyboard:
+        raise RuntimeError("`start_recording` must be called within the "
+                           "context of `read_keyboard`")
     global g_recording
     if g_recording is not None:
         raise AlreadyRecordingError()
     g_recording = KeyboardRecording()
 
-def end_recording() -> KeyboardRecording:
+def end_recording(trauncate_num_raw_key_events: int = 0) -> KeyboardRecording:
+    """
+    End the current recording and return the recorded keyboard events.
+
+    :param truncate_num_raw_key_events: Number of raw key events to remove 
+    from the recording. This is useful to remove the key presses that ends
+    the recording. It must be the number of raw key events, not just the
+    number of keys. For a control sequence, one key corresponds to multiple
+    character inputs.
+
+    It must be called within the context of `read_keyboard`.
+    """
+    if not g_read_keyboard:
+        raise RuntimeError("`end_recording` must be called within the "
+                           "context of `read_keyboard`")
     global g_recording
     if g_recording is None:
         raise NotRecordingError()
     g_recording.set_end_time()
+    g_recording.pop(trauncate_num_raw_key_events)
     recording = g_recording
     g_recording = None
     return recording
@@ -226,9 +267,15 @@ def replay(recording: KeyboardRecording, playback_speed: float = 1.0) -> None:
     Replay the recording at provided playback speed. Playback speed must be a
     positive number.
 
+    It must be called within the context of `read_keyboard`.
+
     Note that once replay starts, all keyboard inputs will be ignored until
     the end of the recording and you cannot stop or pause it.
     """
+    if not g_read_keyboard:
+        raise RuntimeError("`replay` must be called within the "
+                           "context of `read_keyboard`")
+    print("Replay.replay")
     recording.replays(g_key_buffer, playback_speed)
 
 def is_recording() -> bool:
@@ -299,10 +346,11 @@ def _read_keyboard() -> None:
                 g_recording.records(raw_key_event)
     elif GETCH_TYPE == GetchType.Msvcrt:
         while g_read_keyboard:
-            raw_key_event = (getch(), time())
-            g_key_buffer.append(raw_key_event)
-            if g_recording:
-                g_recording.records(raw_key_event)
+            if not g_io_lock.locked():
+                raw_key_event = (getch(), time())
+                g_key_buffer.append(raw_key_event)
+                if g_recording:
+                    g_recording.records(raw_key_event)
     elif GETCH_TYPE == GetchType.Termios:
         while g_read_keyboard:
             if not g_io_lock.locked():
@@ -311,6 +359,3 @@ def _read_keyboard() -> None:
                     g_key_buffer.append(raw_key_event)
                     if g_recording:
                         g_recording.records(raw_key_event)
-            
-
-Thread(target=_read_keyboard, daemon=False).start()
