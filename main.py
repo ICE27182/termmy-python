@@ -25,7 +25,7 @@ frame_buf = ColorBuffer(WIDTH, HEIGHT)
 # frame_buf = ColorBuffer.from_display_settings(display_settings)
 # display_settings.multisampling = MSAAoff
 # display_settings.set_color_mode(ColorMode.ANSI256)
-display_settings.resize_mode = ResizeMode.AsIs
+# display_settings.resize_mode = ResizeMode.AsIs
 
 safe_print(display_settings)
 
@@ -51,7 +51,7 @@ recording = None
 clear()
 with read_keyboard():
     while True:
-        # frame_buf.fill(Color(random()*0.95, random(), random(), 0.01))
+        frame_buf.fill(Color(random()*0.95, random(), random(), 0.01))
         key = get_key()
         if key:
             if key.match("escape"):
@@ -101,27 +101,50 @@ with read_keyboard():
             elif key.match("T"):
                 frame_buf.draw_triangle(triangle[0], triangle[1], triangle[2], True)
             
-            elif key.match("f7"):
+            elif (GETCH_TYPE == GetchType.Msvcrt and key.match("f7") 
+                  or GETCH_TYPE != GetchType.Msvcrt and key.match("7")):
                 if is_recording():
                     recording = end_recording(
-                        len(F7_MSVCRT.code) if GETCH_TYPE == GetchType.Msvcrt
-                        else len(F7_TERMIOS.code)
+                        len(key_constants.F7_MSVCRT.code) if GETCH_TYPE == GetchType.Msvcrt
+                        else len("7")
                     )
                 else:
                     start_recording()
-            elif key.match("f8"):
+            elif (GETCH_TYPE == GetchType.Msvcrt and key.match("f8") 
+                  or GETCH_TYPE != GetchType.Msvcrt and key.match("8")):
                 if recording:
                     replay(recording)
+                    T = time()
+                    print([(k, round(t - T, 3)) for k, t in g_key_buffer])
             elif key.match("f10"):
                 with safe_io():
                     print(f"{is_recording()=}")
                     print(recording)
                     print(g_key_buffer)
                     print(f"{g_io_lock.locked()=}")
-                    getch()
+                    i = input("Give input")
+                    print("Input is", i)
+            elif key.match("S"):
+                if recording:
+                    with open("KeyboardRecording", "w") as kbr:
+                        kbr.write(str(recording))
+            elif key.match("Z"):
+                try:
+                    with open("KeyboardRecording", "r") as kbr:
+                        recording = KeyboardRecording()
+                        recording.recording = [
+                            (values[1][1], float(values[0]))
+                            for line in kbr.read().split("\n")
+                            if (values:=line.replace("\\x1b", "\x1b").split(", ") or True)
+                        ]
+                        recording.start_time = recording.recording[0][1] - 1
+                        recording.end_time = recording.recording[-1][1] + 1
+                except FileNotFoundError:
+                    pass
         
-        if True:
+        if 1:
             display(frame_buf, display_settings, go_back_to_top=True)
         else:
+            sleep(1.0/90.0)
             with safe_io():
                 print(frame_buf.ansi_24(), end="\033[F"*(HEIGHT))

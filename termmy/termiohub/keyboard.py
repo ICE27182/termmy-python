@@ -2,8 +2,11 @@
 
 from .getch import GetchType, GETCH_TYPE, getch
 from .keys import Key, KeyEvent
-from .key_constants import *
-from .keyboard_recording import *
+from .key_constants import TERMIOS_KEY_MAPPING, TERMIOS_SEQUENCE_STARTS
+from .key_constants import MSVCRT_KEY_MAPPING, MSVCRT_SEQUENCE_STARTS
+from .key_constants import ASCII_MAPPING, FALLBACK_KEY_MAPPING
+from .keyboard_recording import KeyboardRecording
+from .keyboard_recording import AlreadyRecordingError, NotRecordingError
 
 from time import time, sleep
 from collections import deque
@@ -11,6 +14,12 @@ from threading import Lock, Thread
 from copy import copy
 from contextlib import contextmanager
 
+if GETCH_TYPE == GetchType.Termios:
+    import tty, termios
+    from .getch import _FD, _OLD_SETTINGS
+    from sys import stdin
+    import builtins
+    _ORIGINAL_PRINT = builtins.print
 
 g_key_mapping = copy(ASCII_MAPPING)
 if GETCH_TYPE == GetchType.Termios:
@@ -32,6 +41,9 @@ g_get_key_event_lock = Lock()
 g_key_buffer: deque[tuple[str, float]] = deque()
 
 g_recording: KeyboardRecording | None = None
+# Only used in get_key_event
+# See the function for more details
+g_pending_future_key_event: KeyEvent | None = None
 
 
 @contextmanager
@@ -63,6 +75,10 @@ def read_keyboard(exit_prompt: str | bool = True):
     # Setup thread
     keyboard_reading_thread = Thread(target=_read_keyboard, daemon=False)
     try:
+        if GETCH_TYPE == GetchType.Termios:
+            from .safe_io import safe_print
+            tty.setraw(_FD)
+            builtins.print = safe_print
         g_read_keyboard = True
         keyboard_reading_thread.start()
         yield
@@ -77,10 +93,13 @@ def read_keyboard(exit_prompt: str | bool = True):
             else:
                 print(exit_prompt)
         keyboard_reading_thread.join()
+        if GETCH_TYPE == GetchType.Termios:
+            termios.tcsetattr(_FD, termios.TCSADRAIN, _OLD_SETTINGS)
+            builtins.print = _ORIGINAL_PRINT
 
 
 def get_key_event(key_buffer_timeout: float = 0.2, 
-                  sequence_timeout: float = 0.05) -> KeyEvent | None:
+                  sequence_timeout: float = 0.125) -> KeyEvent | None:
     """
     Get a key event (key with a timestamp) from the keyboard or the recording
     currently replaying. It must becalled within the context of `read_keyboard`.
@@ -105,11 +124,30 @@ def get_key_event(key_buffer_timeout: float = 0.2,
     key will have all its modifiers set to Modifirer.Unknown and it will have
     exactly one character for both `name` and `code` attributes.
     """
+    # A simple workaround to support recording replay
+    # With the global variable :(, I dont have to refactor get_key_event and
+    # _get_sequence to accommodate future keys. I can just store it in the 
+    # global variable if a key turns out to be a future key.
+    # The cost is using a global variable.
+    global g_pending_future_key_event
+
     if not g_read_keyboard:
         raise RuntimeError("`get_key_event` must be called within the context"
                            " of `read_keyboard`")
 
     with g_get_key_event_lock:
+        if g_pending_future_key_event:
+            # In the past or at present
+            if g_pending_future_key_event.timestamp <= time():
+                g_pending_future_key_event = None
+                # Return it if it is not too old
+                if g_pending_future_key_event.timestamp > time() - key_buffer_timeout:
+                    key_event = g_pending_future_key_event
+                    return key_event
+            # Still in the future
+            else:
+                return None
+        # Oo g_future_key_event_buffer or it has expired
         while g_key_buffer:
             raw_key, timestamp = g_key_buffer.popleft()
             if raw_key in g_sequence_startings:
@@ -123,15 +161,19 @@ def get_key_event(key_buffer_timeout: float = 0.2,
                 continue # Ignore and enter the next iteration
             # Unknown characters such as ®, ∆, ≤
             # Unknown sequence will be handled by `_get_sequence`
-            if key is None:
-                return KeyEvent(Key.unknown_key(raw_key), timestamp)
+            key_event = (KeyEvent(key, timestamp) if key 
+                         else KeyEvent(Key.unknown_key(raw_key), timestamp))
+            # A part of a recording
+            if timestamp > time():
+                g_pending_future_key_event = key_event
+                return None
             else:
-                return KeyEvent(key, timestamp)
+                return key_event
         else:
             return None
 
 def get_key(key_buffer_timeout: float = 0.2, 
-            sequence_timeout: float = 0.05) -> Key | None:
+            sequence_timeout: float = 0.125) -> Key | None:
     """
     Get a key from the keyboard or the recording currently replaying. 
     It must becalled within the context of `read_keyboard`.
@@ -275,7 +317,6 @@ def replay(recording: KeyboardRecording, playback_speed: float = 1.0) -> None:
     if not g_read_keyboard:
         raise RuntimeError("`replay` must be called within the "
                            "context of `read_keyboard`")
-    print("Replay.replay")
     recording.replays(g_key_buffer, playback_speed)
 
 def is_recording() -> bool:
@@ -345,6 +386,7 @@ def _read_keyboard() -> None:
             if g_recording:
                 g_recording.records(raw_key_event)
     elif GETCH_TYPE == GetchType.Msvcrt:
+        
         while g_read_keyboard:
             if not g_io_lock.locked():
                 raw_key_event = (getch(), time())
@@ -354,8 +396,12 @@ def _read_keyboard() -> None:
     elif GETCH_TYPE == GetchType.Termios:
         while g_read_keyboard:
             if not g_io_lock.locked():
-                raw_key_event = (getch(), time())
+                # inlined getch to avoid switching back and forth between
+                # terminal modes
+                raw_key_event = (stdin.read(1), time())
                 with g_io_lock:
                     g_key_buffer.append(raw_key_event)
                     if g_recording:
                         g_recording.records(raw_key_event)
+            else:
+                sleep(0.03)

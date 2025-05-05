@@ -4,7 +4,6 @@ import sys
 import time
 from enum import StrEnum, auto
 from select import select
-from time import sleep
 from warnings import warn
 
 class GetchType(StrEnum):
@@ -46,6 +45,7 @@ else:
         _FD = sys.stdin.fileno()
         _OLD_SETTINGS = termios.tcgetattr(_FD)
         tty.setraw(_FD)
+        termios.tcsetattr(_FD, termios.TCSADRAIN, _OLD_SETTINGS)
         # Since it is possible to get file descriptor and tty attributes
         # the following two getch implmentation shall work
         GETCH_TYPE = GetchType.Termios

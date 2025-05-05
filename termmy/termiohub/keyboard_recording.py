@@ -35,7 +35,7 @@ class KeyboardRecording:
                 raw_key, 
                 offset 
                 + playback_speed_reciprocal * (
-                    timestamp - timestamp_last_key
+                    timestamp - self.start_time
                 )
             ))
 

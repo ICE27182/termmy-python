@@ -1,4 +1,4 @@
 from .safe_io import *
 from .keys import *
-from .key_constants import *
+import termmy.termiohub.key_constants as key_constants
 from .keyboard import *

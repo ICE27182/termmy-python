@@ -1,10 +1,11 @@
 
 
 from .getch import GETCH_TYPE, GetchType
-from .keyboard import g_io_lock, g_key_buffer, g_sequence_startings, g_read_keyboard
+from .keyboard import g_io_lock, g_key_buffer, g_sequence_startings
 from typing import overload, Literal
 from contextlib import contextmanager
-from time import monotonic, time, sleep
+from time import time, sleep
+import builtins
 
 if GETCH_TYPE == GetchType.Termios: 
     import termios
@@ -89,7 +90,6 @@ def safe_print(*values, sep=' ', end='\n', flush=False) -> None:
     else:
         print(*values, sep=sep, end=end, flush=flush)
 
-
 @contextmanager
 def safe_io():
     """
@@ -108,16 +108,19 @@ def safe_io():
         with g_io_lock:
             _wait_sequence()
             try:
+                builtins.input = _input_unsupported
                 termios.tcsetattr(_FD, termios.TCSADRAIN, _OLD_SETTINGS)
                 yield
             finally:
                 tty.setraw(_FD)
+                builtins.input = _ORIGINAL_INPUT
     else:
-        # with g_io_lock:
-            try:
-                yield
-            finally:
-                pass
+        try:
+            builtins.input = _input_unsupported
+            yield
+        finally:
+            builtins.input = _ORIGINAL_INPUT
+
 
 def _wait_sequence():
     if g_key_buffer:
@@ -132,3 +135,7 @@ def _wait_sequence():
                     sleep(wait_time)
                 finally:
                     g_io_lock.acquire()
+
+def _input_unsupported():
+    raise NotImplementedError("input() is disabled in this context")
+_ORIGINAL_INPUT = builtins.input
