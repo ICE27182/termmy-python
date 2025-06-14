@@ -1,8 +1,8 @@
 from .keys import Key, ModifierState
 
-_UNKNOWN = ModifierState.Unknown
-_NO = ModifierState.No
-_YES = ModifierState.Yes
+_UNKNOWN = ModifierState.UNKNOWN
+_NO = ModifierState.NO
+_YES = ModifierState.YES
 
 ################################################################
 # Directions

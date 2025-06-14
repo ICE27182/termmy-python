@@ -1,13 +1,20 @@
+# python
 __pycache__
+# caches & generated files
 *.pickle
 ansi_4bit_lookup
 ansi_8bit_lookup
-*mynotes*
-.DS_Store
-tmp.*
-small.bmp
-.vscode
-ignored*
 PaletteLookup_*
-.continue
 KeyboardRecording
+# mine
+*mynotes*
+tmp.*
+ignored*
+termmy/images/?.py
+termmy/termiohub_/
+# env
+.DS_Store
+.vscode
+.continue
+# resources
+small.bmp

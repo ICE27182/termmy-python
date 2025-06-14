@@ -5,19 +5,19 @@ from dataclasses import dataclass
 from enum import StrEnum, auto
 
 class ModifierState(StrEnum):
-    Yes = auto()
-    No = auto()
-    Unknown = auto()
+    YES = auto()
+    NO = auto()
+    UNKNOWN = auto()
 
 @dataclass(slots=True, frozen=True)
 class Key:
     name: str
     code: str
-    shift: ModifierState = ModifierState.Unknown
-    control: ModifierState = ModifierState.Unknown
-    command: ModifierState = ModifierState.Unknown
-    option: ModifierState = ModifierState.Unknown
-    alt: ModifierState = ModifierState.Unknown
+    shift: ModifierState = ModifierState.UNKNOWN
+    control: ModifierState = ModifierState.UNKNOWN
+    command: ModifierState = ModifierState.UNKNOWN
+    option: ModifierState = ModifierState.UNKNOWN
+    alt: ModifierState = ModifierState.UNKNOWN
 
     @classmethod
     def unknown_key(cls, code: str) -> Key:
@@ -47,20 +47,20 @@ class Key:
         return (
             isinstance(key, Key)
             and self.name == key.name
-            and (self.shift == ModifierState.Unknown
-                 or key.shift == ModifierState.Unknown
+            and (self.shift == ModifierState.UNKNOWN
+                 or key.shift == ModifierState.UNKNOWN
                  or key.shift == self.shift)
-            and (self.control == ModifierState.Unknown
-                 or key.control == ModifierState.Unknown
+            and (self.control == ModifierState.UNKNOWN
+                 or key.control == ModifierState.UNKNOWN
                  or key.control == self.control)
-            and (self.command == ModifierState.Unknown
-                 or key.command == ModifierState.Unknown
+            and (self.command == ModifierState.UNKNOWN
+                 or key.command == ModifierState.UNKNOWN
                  or key.command == self.command)
-            and (self.option == ModifierState.Unknown
-                 or key.option == ModifierState.Unknown
+            and (self.option == ModifierState.UNKNOWN
+                 or key.option == ModifierState.UNKNOWN
                  or key.option == self.option)
-            and (self.alt == ModifierState.Unknown
-                 or key.alt == ModifierState.Unknown
+            and (self.alt == ModifierState.UNKNOWN
+                 or key.alt == ModifierState.UNKNOWN
                  or key.alt == self.alt)
             or isinstance(key, str)
             and self.name == key

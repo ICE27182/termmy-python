@@ -5,6 +5,7 @@ from math import log10
 from time import sleep
 from random import random
 from collections import deque
+from copy import copy
 
 def clear():
     from os import system
@@ -27,7 +28,7 @@ frame_buf = ColorBuffer(WIDTH, HEIGHT)
 # display_settings.set_color_mode(ColorMode.ANSI256)
 # display_settings.resize_mode = ResizeMode.AsIs
 
-safe_print(display_settings)
+print(display_settings)
 
 def default():
     frame_buf.fill()
@@ -40,7 +41,6 @@ def default():
     frame_buf.set_color(61, 8, Color.from_ints(255, 0, 0))
     frame_buf.draw_triangle(Vec2i(4, 4), Vec2i(20, 28), Vec2i(52, 15), 
                             fillcolor=True)
-
 default()
 
 current_color = ICE
@@ -49,13 +49,13 @@ line = deque([copy(pos), copy(pos)], maxlen=2)
 triangle = deque([copy(pos), copy(pos), copy(pos)], maxlen=3)
 recording = None
 clear()
-with read_keyboard():
+with TermIOHub() as io_hub:
     while True:
         frame_buf.fill(Color(random()*0.95, random(), random(), 0.01))
-        key = get_key()
+        key = io_hub.get_key()
         if key:
             if key.match("escape"):
-                safe_print("Exiting")
+                io_hub.safe_print("Exiting")
                 sleep(0.5)
                 break
             elif key.match("F"):
@@ -103,22 +103,22 @@ with read_keyboard():
             
             elif (GETCH_TYPE == GetchType.Msvcrt and key.match("f7") 
                   or GETCH_TYPE != GetchType.Msvcrt and key.match("7")):
-                if is_recording():
-                    recording = end_recording(
+                if keyboard.is_recording():
+                    recording = keyboard.end_recording(
                         len(key_constants.F7_MSVCRT.code) if GETCH_TYPE == GetchType.Msvcrt
                         else len("7")
                     )
                 else:
-                    start_recording()
+                    keyboard.start_recording()
             elif (GETCH_TYPE == GetchType.Msvcrt and key.match("f8") 
                   or GETCH_TYPE != GetchType.Msvcrt and key.match("8")):
                 if recording:
-                    replay(recording)
+                    keyboard.replay(recording)
                     T = time()
                     print([(k, round(t - T, 3)) for k, t in g_key_buffer])
             elif key.match("f10"):
                 with safe_io():
-                    print(f"{is_recording()=}")
+                    print(f"{keyboard.is_recording()=}")
                     print(recording)
                     print(g_key_buffer)
                     print(f"{g_io_lock.locked()=}")
@@ -132,13 +132,13 @@ with read_keyboard():
                 try:
                     with open("KeyboardRecording", "r") as kbr:
                         recording = KeyboardRecording()
-                        recording.recording = [
+                        recording.data = [
                             (values[1][1], float(values[0]))
                             for line in kbr.read().split("\n")
                             if (values:=line.replace("\\x1b", "\x1b").split(", ") or True)
                         ]
-                        recording.start_time = recording.recording[0][1] - 1
-                        recording.end_time = recording.recording[-1][1] + 1
+                        recording.start_time = recording.data[0][1] - 1
+                        recording.end_time = recording.data[-1][1] + 1
                 except FileNotFoundError:
                     pass
         
