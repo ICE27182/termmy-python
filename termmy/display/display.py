@@ -4,7 +4,7 @@ from .display_settings import DisplaySettings, ColorMode, ResizeMode
 from termmy.colors import Color, ColorQuantizer
 from termmy.buffers import Buffer2D
 from termmy.buffers.msaa_patterns import *
-from termmy.termiohub import TermIOHub
+from termmy.termiohub import safe_print
 
 from typing import Any, overload, Callable
 
@@ -102,54 +102,29 @@ def display(
     format_str = "%s" * (range_of_x.stop - range_of_x.start) + ""
     # go_back_to_top is 0 when it is false
     row_num_going_back = go_back_to_top * (range_of_y.stop-range_of_y.start)
-    if TermIOHub._active_instance:
-        TermIOHub._active_instance.safe_print(
-            "\033[?25l" +
-            "\033[0m\n".join(
-                format_str % tuple(
-                    _pixel_color(buffer=buffer,
-                                x_display=x_display,
-                                y_display=y_display,
-                                buffer_width=buffer_width,
-                                buffer_height=buffer_height,
-                                gamma_reciprocal=gamma_reciprocal,
-                                inverse=inverse,
-                                quantizer=quantizer,
-                                multisampling=multisampling,
-                                horizontal_scalar=horizontal_scalar,
-                                vertical_scalar=vertical_scalar,
-                                tone_mapping=tone_mapping,
-                                display_settings=display_settings)
-                    for x_display in range_of_x
-                )
-                for y_display in range_of_y
-            ),
-            end=f"\033[0m\n{row_num_going_back * "\033[F"}\033[?25h"
-        )
-    else:
-        print(
-            "\033[?25l" +
-            "\033[0m\n".join(
-                format_str % tuple(
-                    _pixel_color(buffer=buffer,
-                                x_display=x_display,
-                                y_display=y_display,
-                                buffer_width=buffer_width,
-                                buffer_height=buffer_height,
-                                gamma_reciprocal=gamma_reciprocal,
-                                inverse=inverse,
-                                quantizer=quantizer,
-                                multisampling=multisampling,
-                                horizontal_scalar=horizontal_scalar,
-                                vertical_scalar=vertical_scalar,
-                                tone_mapping=tone_mapping,
-                                display_settings=display_settings)
-                    for x_display in range_of_x
-                )
-                for y_display in range_of_y
-            ),
-            end=f"\033[0m\n{row_num_going_back * "\033[F"}\033[?25h"
-        )
+    safe_print(
+        "\033[?25l" +
+        "\033[0m\n".join(
+            format_str % tuple(
+                _pixel_color(buffer=buffer,
+                            x_display=x_display,
+                            y_display=y_display,
+                            buffer_width=buffer_width,
+                            buffer_height=buffer_height,
+                            gamma_reciprocal=gamma_reciprocal,
+                            inverse=inverse,
+                            quantizer=quantizer,
+                            multisampling=multisampling,
+                            horizontal_scalar=horizontal_scalar,
+                            vertical_scalar=vertical_scalar,
+                            tone_mapping=tone_mapping,
+                            display_settings=display_settings)
+                for x_display in range_of_x
+            )
+            for y_display in range_of_y
+        ),
+        end=f"\033[0m\n{row_num_going_back * "\033[F"}\033[?25h"
+    )
 
 def _pixel_color(
     buffer: Buffer2D,

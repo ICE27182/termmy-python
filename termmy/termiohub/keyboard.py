@@ -9,14 +9,12 @@ from .key_constants import MSVCRT_KEY_MAPPING, MSVCRT_SEQUENCE_STARTS
 from .key_constants import ASCII_MAPPING, FALLBACK_KEY_MAPPING
 from .keyboard_recording import KeyboardRecording
 
-from typing import Literal, ContextManager, ClassVar, final
-from collections.abc import Generator
+from typing import ContextManager, ClassVar, final
 from types import MappingProxyType
-from contextlib import contextmanager
-from threading import Thread, Lock, RLock, Condition, Event
+from threading import Thread, RLock, Condition, Event
 from time import time
 from copy import copy
-from queue import Queue, Empty
+from queue import Queue
 
 if GETCH_TYPE == GetchType.Termios:
     import termios, tty, sys
@@ -25,11 +23,10 @@ if GETCH_TYPE == GetchType.Termios:
     _set_term_default = lambda: termios.tcsetattr(_FD, 
                                                  termios.TCSADRAIN, 
                                                  _OLD_SETTINGS)
-    _flush_term = lambda: termios.tcflush(sys.stdin, termios.TCIFLUSH)
     _read = sys.stdin.read
 
 @final
-class TermIOHub(ContextManager):
+class Keyboard(ContextManager):
     __slots__ = (
         "_inside_safe_io",
         "exit_prompt",
@@ -48,7 +45,7 @@ class TermIOHub(ContextManager):
         "recording",
     )
     _active_instance_lock: ClassVar[RLock] = RLock()
-    _active_instance: ClassVar[TermIOHub | None] = None
+    _active_instance: ClassVar[Keyboard | None] = None
 
     _inside_safe_io: bool
     exit_prompt: str
@@ -92,7 +89,8 @@ class TermIOHub(ContextManager):
 
         In order to take keyboard input, it may interfere with the
         default io operations such as `print`, `intput`, etc.
-        Use `safe_print` and/or `safe_io`, etc. to prevent such interference.
+        Use `safe_print` function and/or `safe_io` context, 
+        to prevent such interference.
 
         The instance should not be reused after exiting the context manager,
         or a RuntimeError will raise.
@@ -118,16 +116,16 @@ class TermIOHub(ContextManager):
         
         Raises:
             RuntimeError: If the context manager is nested (i.e. an instance
-                of TermIOHub is already active).
+                of Keyboard is already active).
         """
-        if TermIOHub._active_instance is not None:
+        if Keyboard._active_instance is not None:
             raise RuntimeError("Only one instance of TermioHub can be "
                                "created and used at a time.")
         self._inside_safe_io = False
         self.exit_prompt = exit_prompt
 
         (self._key_mappings,
-         self._sequence_startings) = TermIOHub._get_default_key_mappings()
+         self._sequence_startings) = Keyboard._get_default_key_mappings()
         self.key_event_buffer = Queue()
 
         self._char_buffer: list[str] = []
@@ -148,16 +146,16 @@ class TermIOHub(ContextManager):
     def __enter__(self):
         """Sets up the terminal for non-blocking keyboard input (if possible),
         starts the keyboard reading thread, and enforces that only one 
-        TermIOHub instance is active at a time.
+        Keyboard instance is active at a time.
 
         Raises:
-            RuntimeError: If another TermIOHub instance is already active.
+            RuntimeError: If another Keyboard instance is already active.
         """
-        with TermIOHub._active_instance_lock:
-            if TermIOHub._active_instance is not None:
+        with Keyboard._active_instance_lock:
+            if Keyboard._active_instance is not None:
                 raise RuntimeError("Only one instance of TermioHub can be "
                                    "created and used at a time.")
-            TermIOHub._active_instance = self
+            Keyboard._active_instance = self
             # Ensure the code the terminal is set to raw inside the context
             if GETCH_TYPE == GetchType.Termios:
                 _set_term_raw()
@@ -172,19 +170,20 @@ class TermIOHub(ContextManager):
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         """It joins the keyboard reading thread, deactivates itself from
-        `TermIOHub._active_instance`, and optionally sets the terminal back
+        `Keyboard._active_instance`, and optionally sets the terminal back
         to default.
         """
         if self.thread.is_alive():
             if self.exit_prompt:
-                self.safe_print(self.exit_prompt)
+                from .safe_io import safe_print
+                safe_print(self.exit_prompt)
             self._stop_reading_keyboard.set()
             self.thread.join()
-        # `TermIOHub._active_instance_lock` is not used here because 
+        # `Keyboard._active_instance_lock` is not used here because 
         # it is assumed that only the thread that set the active instance
         # will set it back to `None`
-        if TermIOHub._active_instance is self:
-            TermIOHub._active_instance = None
+        if Keyboard._active_instance is self:
+            Keyboard._active_instance = None
             if GETCH_TYPE == GetchType.Termios:
                 _set_term_default()
     
@@ -275,67 +274,7 @@ class TermIOHub(ContextManager):
                             for r in self._key_mappings.keys())):
                 del self._sequence_startings[starting]
         return out
-        
-    ################################################################
-    # Safe IO
-    ################################################################
-    @contextmanager
-    def safe_io(self) -> Generator[None, None, None]:
-        """Context manager for safe IO operations within the TermIOHub 
-        context. This ensures that IO operations behave the same way as
-        they would outside the TermIOHub context.
-
-        Raises:
-            RuntimeError: If called outside of the TermIOHub context or in
-                            the context of another TermIOHub instance.
-        """
-        if not (TermIOHub._active_instance is self):
-            raise RuntimeError("`safe_io` is called outside of the "
-                                "TermIOHub context or in the context of "
-                                "another TermIOHub instance.")
-        with self.io_lock:
-            if self.reading_seq.is_set():
-                # If it is still reading a sequence, wait till it is done
-                # or timeout and interpret the character(s) as individual 
-                # key(s).
-                # It times out if the user press a single Escape, or a
-                # key with unregistered sequence (e.g. shift + up).
-                # This function is not responsible for interpreting the
-                # sequence because it only needs to make sure it will
-                # not happen that the terminal is set from raw to default
-                # will a sequence is not fully read, leading to it being
-                # interpreted as individual characters later.
-                self.not_reading_seq.wait(self.sequence_timeout)
-            try:
-                self._inside_safe_io = True
-                if GETCH_TYPE == GetchType.Termios:
-                    _set_term_default()
-                yield
-            finally:
-                if GETCH_TYPE == GetchType.Termios:
-                    _flush_term()
-                    _set_term_raw()
-                self._inside_safe_io = False
-                return
     
-    def safe_print(self,
-                   *values: object,
-                   sep: str | None = " ",
-                   end: str | None = "\n",
-                   flush: Literal[False] | bool = False) -> None:
-        """A safe version of print to use within TermIOHub.
-        ```
-        with TermIOHub() as io_hub:
-            ...
-            io_hub.safe_print(...)
-            # It is the same as using
-            with io_hub.safe_io():
-                print(...)
-            ...
-        """
-        with self.safe_io():
-            print(*values, sep=sep, end=end, flush=flush)
-
     ################################################################
     # Recording
     ################################################################

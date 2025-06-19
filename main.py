@@ -50,16 +50,16 @@ line = deque([copy(pos), copy(pos)], maxlen=2)
 triangle = deque([copy(pos), copy(pos), copy(pos)], maxlen=3)
 recording = None
 clear()
-with TermIOHub() as io_hub:
+with Keyboard() as keyboard:
     while True:
         frame_buf.fill(Color(random()*0.95, random(), random(), 0.01))
 
         # Controls
-        key_event = io_hub.get_key_event()
+        key_event = keyboard.get_key_event()
         if key_event:
             key = key_event.key
             if key.match("escape"):
-                io_hub.safe_print("Exiting")
+                safe_print("Exiting")
                 sleep(0.5)
                 break
             # Canvas
@@ -109,7 +109,7 @@ with TermIOHub() as io_hub:
 
             # Commands
             elif key.match("/"):
-                with io_hub.safe_io():
+                with safe_io():
                     while True:
                         command = input("/")
                         if command.startswith(("echo ", "print ")):
@@ -123,17 +123,17 @@ with TermIOHub() as io_hub:
             # Recording
             elif (sys.platform == "win32" and key.match("f7") 
                   or key.match("7")):
-                if io_hub.is_recording():
-                    recording = io_hub.end_recording(
+                if keyboard.is_recording():
+                    recording = keyboard.end_recording(
                         len(key_constants.F7_MSVCRT.code) if sys.platform == "win32"
                         else len("7")
                     )
                 else:
-                    io_hub.start_recording()
+                    keyboard.start_recording()
             elif (sys.platform == "win32" and key.match("f8") 
                   or key.match("8")):
                 if recording:
-                    io_hub.replay(recording)
+                    keyboard.replay(recording)
                     T = time()
             elif key.match("S"):
                 if recording:
@@ -158,5 +158,5 @@ with TermIOHub() as io_hub:
             display(frame_buf, display_settings, go_back_to_top=True)
         else:
             sleep(1.0/90.0)
-            with io_hub.safe_io():
+            with safe_io():
                 print(frame_buf.ansi_24(), end="\033[F"*(HEIGHT))
