@@ -14,7 +14,7 @@ from types import MappingProxyType
 from threading import Thread, RLock, Condition, Event
 from time import time
 from copy import copy
-from queue import Queue
+from collections import deque
 
 if GETCH_TYPE == GetchType.Termios:
     import termios, tty, sys
@@ -52,7 +52,7 @@ class Keyboard(ContextManager):
 
     _key_mappings: dict[str, Key]
     _sequence_startings: set[str]
-    key_event_buffer: Queue[KeyEvent]
+    key_event_buffer: deque[KeyEvent]
 
     # Access to these buffers should be synchronized
     # Low level buffer used for sequence interpretation.
@@ -126,7 +126,7 @@ class Keyboard(ContextManager):
 
         (self._key_mappings,
          self._sequence_startings) = Keyboard._get_default_key_mappings()
-        self.key_event_buffer = Queue()
+        self.key_event_buffer = deque()
 
         self._char_buffer: list[str] = []
         self._timestamp_buffer: list[float] = []
@@ -206,7 +206,7 @@ class Keyboard(ContextManager):
                                "a safe_io block.")
         with self.io_lock:
             while True:
-                if self.key_event_buffer.empty():
+                if not self.key_event_buffer:
                     if self.reading_seq.is_set():
                         # If it is still reading a sequence, wait till it is done
                         # or timeout and interpret the character(s) as individual 
@@ -220,7 +220,7 @@ class Keyboard(ContextManager):
                         # Now the key event buffer should not longer be empty.
                     else:
                         return None
-                key_event = self.key_event_buffer.get_nowait()
+                key_event = self.key_event_buffer[0]
                 time_diff = time() - key_event.timestamp
                 if time_diff < 0:
                     # A future key event from the recording being replayed.
@@ -229,7 +229,12 @@ class Keyboard(ContextManager):
                     # timed out.
                     return None
                 elif time_diff <= self.key_buffer_timeout:
+                    # Valid key event
+                    self.key_event_buffer.popleft()
                     return key_event
+                else:
+                    # The key event times out
+                    self.key_event_buffer.popleft()
                     
     @property
     def key_mappings(self) -> MappingProxyType[dict[str, Key]]:
@@ -390,7 +395,7 @@ class Keyboard(ContextManager):
             string = input()
             char = string[-1] if string else ""
             timestamp = time()
-            self.key_event_buffer(KeyEvent(
+            self.key_event_buffer.append(KeyEvent(
                 self._key_mappings.get(char, Key.unknown_key(char)),
                 timestamp,
             ))
@@ -460,7 +465,7 @@ class Keyboard(ContextManager):
                 for char, timestamp in zip(char_buf, time_buf):
                     key = key_mappings.get(char, Key.unknown_key(char))
                     key_event = KeyEvent(key, timestamp)
-                    self.key_event_buffer.put(key_event)
+                    self.key_event_buffer.append(key_event)
                     if self.recording:
                         self.recording.add(key_event)
             else:
@@ -468,7 +473,7 @@ class Keyboard(ContextManager):
                 key = key_mappings[seq]
                 timestamp = time_buf[0]
                 key_event = KeyEvent(key, timestamp)
-                self.key_event_buffer.put(key_event)
+                self.key_event_buffer.append(key_event)
                 if self.recording:
                     self.recording.add(key_event)
             # Reached unless it is an incomplete sequence and it has not
@@ -480,7 +485,7 @@ class Keyboard(ContextManager):
             key = key_mappings.get(starting_char, 
                                    Key.unknown_key(starting_char))
             key_event = KeyEvent(key, starting_time)
-            self.key_event_buffer.put(key_event)
+            self.key_event_buffer.append(key_event)
             if self.recording:
                 self.recording.add(key_event)
         # Reached everytime except when the sequence is incomplete.

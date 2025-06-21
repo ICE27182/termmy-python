@@ -140,7 +140,7 @@ with Keyboard() as keyboard:
                     clear()
                     print(f"{recording}")
                     print("-"*scene.width)
-                    print(f"{keyboard.key_event_buffer.empty()=}")
+                    print(f"{keyboard.key_event_buffer=}")
                     getch()
                     
             
@@ -149,5 +149,4 @@ with Keyboard() as keyboard:
             display(scene, display_settings, go_back_to_top=True)
         else:
             sleep(1.0/90.0)
-            with safe_io():
-                print(scene.ansi_24(), end="\033[F"*(HEIGHT))
+            safe_print(scene.ansi_24(), end="\033[F"*(HEIGHT))

@@ -42,14 +42,6 @@ class KeyboardRecording(Iterable):
                  starting_time: float | None = None, 
                  end_time: float | None = None) -> Self:
         raise NotImplementedError
-        data = [
-            (values[1][1:-1], float(values[0]))
-            for line in decode(string, "unicode_escape").splitlines()
-            if (values:=line.split(", ") or True)
-        ]
-        return cls(starting_time or data[0][1] - 1.0,
-                   end_time or data[-1][1] + 1.0,
-                   data)
     
     def is_recording(self) -> bool:
         return self.start_time is not None and self.end_time is None
@@ -91,7 +83,7 @@ class KeyboardRecording(Iterable):
         playback_speed_reciprocal = 1.0 / playback_speed
         offset = time()
         for key_event in self.data:
-            keyboard.key_event_buffer.put(
+            keyboard.key_event_buffer.append(
                 KeyEvent(
                     key_event.key, 
                     offset + playback_speed_reciprocal * (
