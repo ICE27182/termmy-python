@@ -115,12 +115,33 @@ with Keyboard() as keyboard:
             elif key.match("/"):
                 with safe_io():
                     while True:
-                        command = input("/")
+                        command = input("/").strip()
                         if command.startswith(("echo ", "print ")):
                             content = " ".join(command.split()[1:])
                             print(content)
                         elif command.startswith(("exit", "quit", "Q")):
                             break
+                        elif command.startswith("recording"):
+                            command = command.split()
+                            if command[-1] == "show":
+                                print(f"{recording}")
+                            elif command[-1] == "save":
+                                if not recording:
+                                    print(f"No recording to save")
+                                else:
+                                    with open("KeyboardRecording", "w") as f:
+                                        f.write(recording.to_json())
+                                        print("Saved recording to "
+                                              "`KeyboardRecording` file.")
+                            elif command[-1] == "load":
+                                with open("KeyboardRecording", "r") as f:
+                                    recording = KeyboardRecording.from_json_string(f.read())
+                                    print(f"Loaded recording from "
+                                          "`KeyboardRecording` file.")
+                            else:
+                                print(f"{recording}")
+                        elif command.startswith("clear"):
+                            clear()
                         else:
                             print(f"Unknown command `{command}`")
             
@@ -142,8 +163,6 @@ with Keyboard() as keyboard:
                     print("-"*scene.width)
                     print(f"{keyboard.key_event_buffer=}")
                     getch()
-                    
-            
         
         if 1:
             display(scene, display_settings, go_back_to_top=True)

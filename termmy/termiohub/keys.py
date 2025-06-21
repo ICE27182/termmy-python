@@ -3,11 +3,20 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum, auto
+from json import loads, dumps
 
 class ModifierState(StrEnum):
     YES = auto()
     NO = auto()
     UNKNOWN = auto()
+    
+    @classmethod
+    def from_str(cls, string: str) -> ModifierState:
+        return {
+            "YES": ModifierState.YES,
+            "NO": ModifierState.NO,
+            "UNKNOWN": ModifierState.UNKNOWN,
+        }.get(string.upper(), ModifierState.UNKNOWN)
 
 @dataclass(slots=True, frozen=True)
 class Key:
@@ -18,6 +27,30 @@ class Key:
     command: ModifierState = ModifierState.UNKNOWN
     option: ModifierState = ModifierState.UNKNOWN
     alt: ModifierState = ModifierState.UNKNOWN
+
+    @classmethod
+    def from_json_string(cls, json_string: dict) -> Key:
+        obj = loads(json_string)
+        return cls(
+            name=obj["name"],
+            code=obj["code"],
+            shift=ModifierState(obj["shift"]),
+            control=ModifierState(obj["control"]),
+            command=ModifierState(obj["command"]),
+            option=ModifierState(obj["option"]),
+            alt=ModifierState(obj["alt"]),
+        )
+    
+    def to_json(self) -> str:
+        return dumps({
+            "name": self.name,
+            "code": self.code,
+            "shift": self.shift.value,
+            "control": self.control.value,
+            "command": self.command.value,
+            "option": self.option.value,
+            "alt": self.alt.value,
+        }, indent=4)
 
     @classmethod
     def unknown_key(cls, code: str) -> Key:
@@ -113,3 +146,17 @@ class Key:
 class KeyEvent:
     key: Key | None
     timestamp: float
+
+    @classmethod
+    def from_json_string(cls, json_string: str) -> KeyEvent:
+        obj = loads(json_string)
+        return cls(
+            key=Key.from_json_string(obj["key"]) if obj["key"] else None,
+            timestamp=obj["timestamp"],
+        )
+    
+    def to_json(self) -> str:
+        return dumps({
+            "key": self.key.to_json() if self.key else None,
+            "timestamp": self.timestamp,
+        }, indent=4)
