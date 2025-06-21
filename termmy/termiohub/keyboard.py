@@ -82,7 +82,7 @@ class Keyboard(ContextManager):
     ################################################################
     def __init__(self, exit_prompt: str = "Press 'Enter' to exit ...",
                  key_buffer_timeout: float = 0.25,
-                 sequence_timeout: float = 0.125):
+                 sequence_timeout: float = 0.1):
         """A context manager for managing terminal input and output. 
 
         You can take keyboard input within the context with `get_key_event()`.
@@ -106,9 +106,12 @@ class Keyboard(ContextManager):
 
         Args:
             exit_prompt (str): Display prompt at exit. Use "" to disable.
-            key_buffer_timeout (float): Key presses before the timeout will be
-                ignored. Setting it too high may lead to large latency and
-                setting it too low may lead to missing key presses.
+            key_buffer_timeout (float): Key presses before the timeout will 
+                be ignored. Setting it too high may lead to large latency 
+                and setting it too low may lead to missing key presses.
+                It is recommended to set it at least larger than 
+                `2*sequence_timeout`. Set it larger if there are missing key
+                presses, especially Escape key on Unix-like systems.
             sequence_timeout (float): Timeout for waiting for a control
                 sequence of keys. Setting it high may lead high latency when
                 pressing certain keys and setting it too low may lead to 
@@ -140,7 +143,6 @@ class Keyboard(ContextManager):
         self.key_buffer_timeout = key_buffer_timeout
         self.sequence_timeout = sequence_timeout
 
-        # TODO finish recording
         self.recording = None
 
     def __enter__(self):
@@ -222,7 +224,8 @@ class Keyboard(ContextManager):
                         return None
                 key_event = self.key_event_buffer[0]
                 time_diff = time() - key_event.timestamp
-                if time_diff < 0:
+                print(f"\033[F\033[F\033[38;2;255;220;156m{time_diff:.6f}\t{str(key_event):200}")
+                if time_diff < 0.0:
                     # A future key event from the recording being replayed.
                     # Return None for now and return the key event later when
                     # it becomes a present or a past key event that has not
