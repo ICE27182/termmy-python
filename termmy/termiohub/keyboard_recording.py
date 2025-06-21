@@ -1,10 +1,16 @@
 
+from __future__ import annotations
+
+from .keys import KeyEvent
 
 from dataclasses import dataclass, field
 from time import time
-from collections import deque
-from typing import Self
+from collections.abc import Iterable, Iterator
+from typing import Self, TYPE_CHECKING
 from codecs import decode
+
+if TYPE_CHECKING:
+    from .keyboard import Keyboard
 
 class KeyboardRecordingError(Exception): pass
 
@@ -14,27 +20,28 @@ class AlreadyRecordingError(KeyboardRecordingError): pass
 class NotRecordingError(KeyboardRecordingError): pass
 
 @dataclass(slots=True)
-class KeyboardRecording:
+class KeyboardRecording(Iterable):
     start_time: float | None = None
     end_time: float | None = None
-    data: list[tuple[str, float]] = field(default_factory=list)
+    data: list[KeyEvent] = field(default_factory=list)
 
     def __bool__(self) -> bool:
         return self.start_time is not None
     
+    def __iter__(self) -> Iterator[KeyEvent]:
+        return self.data.__iter__()
+    
     def __str__(self) -> str:
-        timestamp_num_digits = (len(str(round(self.data[-1][1], 3))) if self.data 
-                                else len(str(int(round(self.start_time, 3))))
-                                if self.start_time is not None else 16)
         return "\n".join(
-            f"{raw_key_event[1]:{timestamp_num_digits}.3f}, {repr(raw_key_event[0])}"
-            for raw_key_event in self.data
+            f"{key_event.timestamp} {repr(key_event.key)}" 
+            for key_event in self.data
         )
     
     @classmethod
     def from_str(cls, string: str, 
                  starting_time: float | None = None, 
                  end_time: float | None = None) -> Self:
+        raise NotImplementedError
         data = [
             (values[1][1:-1], float(values[0]))
             for line in decode(string, "unicode_escape").splitlines()
@@ -50,47 +57,48 @@ class KeyboardRecording:
     def finished(self) -> bool:
         return self.start_time is not None and self.end_time is not None
 
-    def start(self, raw_key_event: tuple[str, float]) -> None:
+    def start_recording(self) -> None:
         if self.finished():
             raise RecordingExistsError()
         elif self.is_recording():
             raise AlreadyRecordingError()
         self.start_time = time()
-        self.data.append(raw_key_event)
     
-    def end(self, trim_raw_events: int = 0) -> Self:
+    def add(self, key_event: KeyEvent) -> None:
         if not self.is_recording():
             raise NotRecordingError()
-        self.end_time = time()
-        self.pop(trim_raw_events)
-        return self
+        self.data.append(key_event)
     
-    def pop(self, num_raw_key_events: int) -> tuple[tuple[str, float], ...]:
-        return reversed(tuple(self.data.pop() for _ in range(num_raw_key_events)))
+    def end_recording(self, trim_key_events: int = 0) -> Self:
+        if not self.is_recording():
+            raise NotRecordingError()
+        elif trim_key_events < 0:
+            raise ValueError("trim_key_events must be non-negative.")
+        self.end_time = time()
+        for _ in range(min(trim_key_events, len(self.data))):
+            self.data.pop()
+        return self
     
     def clear(self) -> None:
         self.start_time = None
         self.end_time = None
         self.data.clear()
     
-    def replay(self, key_buffer: deque[tuple[str, float]],
+    def replay(self, keyboard: Keyboard,
                playback_speed: float = 1.0) -> None:
         if not self.finished():
             raise RecordingNotExistsError()
-        timestamp_last_key = self.start_time
-        if timestamp_last_key is None:
-            raise ValueError("The recording does not have a start time.")
         playback_speed_reciprocal = 1.0 / playback_speed
         offset = time()
-        for raw_key_event in self.data:
-            raw_key, timestamp = raw_key_event
-            key_buffer.append((
-                raw_key, 
-                offset 
-                + playback_speed_reciprocal * (
-                    timestamp - self.start_time
+        for key_event in self.data:
+            keyboard.key_event_buffer.put(
+                KeyEvent(
+                    key_event.key, 
+                    offset + playback_speed_reciprocal * (
+                        key_event.timestamp - self.start_time
+                    ),
                 )
-            ))
+            )
     
     @property
     def duration(self) -> float | None:
@@ -99,4 +107,3 @@ class KeyboardRecording:
         else:
             return None
         
-

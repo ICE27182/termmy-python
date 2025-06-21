@@ -205,21 +205,31 @@ class Keyboard(ContextManager):
             raise RuntimeError("get_key_event() cannot be called inside of "
                                "a safe_io block.")
         with self.io_lock:
-            if self.key_event_buffer.empty():
-                if self.reading_seq.is_set():
-                    # If it is still reading a sequence, wait till it is done
-                    # or timeout and interpret the character(s) as individual 
-                    # key(s).
-                    # It times out if the user press a single Escape, or a
-                    # key with unregistered sequence (e.g. shift + up).
-                    # If so, this thread will be responsible for interpreting
-                    # the sequence or character.
-                    self.not_reading_seq.wait(self.sequence_timeout)
-                    self._add_key_to_buffer(time())
-                    # Now the key event buffer should not longer be empty.
-                else:
+            while True:
+                if self.key_event_buffer.empty():
+                    if self.reading_seq.is_set():
+                        # If it is still reading a sequence, wait till it is done
+                        # or timeout and interpret the character(s) as individual 
+                        # key(s).
+                        # It times out if the user press a single Escape, or a
+                        # key with unregistered sequence (e.g. shift + up).
+                        # If so, this thread will be responsible for interpreting
+                        # the sequence or character.
+                        self.not_reading_seq.wait(self.sequence_timeout)
+                        self._add_key_to_buffer(time())
+                        # Now the key event buffer should not longer be empty.
+                    else:
+                        return None
+                key_event = self.key_event_buffer.get_nowait()
+                time_diff = time() - key_event.timestamp
+                if time_diff < 0:
+                    # A future key event from the recording being replayed.
+                    # Return None for now and return the key event later when
+                    # it becomes a present or a past key event that has not
+                    # timed out.
                     return None
-            return self.key_event_buffer.get_nowait()
+                elif time_diff <= self.key_buffer_timeout:
+                    return key_event
                     
     @property
     def key_mappings(self) -> MappingProxyType[dict[str, Key]]:
@@ -279,19 +289,58 @@ class Keyboard(ContextManager):
     # Recording
     ################################################################
     def is_recording(self) -> bool:
-        raise NotImplementedError
+        return self.recording is not None
     
     def start_recording(self) -> None:
-        raise NotImplementedError
+        """Starts recording keyboard input.
+        
+        Raises:
+            RecordingExistsError: If the `recording` has ended.
+            AlreadyRecordingError: If the keyboard is already recording.
+        """
+        self.recording = KeyboardRecording()
+        self.recording.start_recording()
     
-    def end_recording(self, ignore_tail_key_events: int = 0) -> KeyboardRecording:
-        raise NotImplementedError
+    def end_recording(self, trim_key_events: int = 0) -> KeyboardRecording:
+        """Stops recording and returns the recorded KeyboardRecording.
+
+        Args:
+            trim_raw_events (int): The number of raw events to remove from the
+                end of the recording. Defaults to 0. This can be useful when
+                a key pressed is used to stop recording and you want to remove
+                that key press from the recording.
+           
+        Returns:
+            KeyboardRecording: The recorded keyboard input.
+
+        Raises:
+           NotRecordingError: If the keyboard is not currently recording.
+           ValueError: If trim_raw_events is negative
+        """
+        out = self.recording.end_recording(trim_key_events)
+        self.recording = None
+        return out
     
     def replay(self, recording: KeyboardRecording, playback_speed: float = 1.0) -> None:
-        raise NotImplementedError
-    
-    def get_recording(self) -> KeyboardRecording | None:
-        raise NotImplementedError
+        """Start replaying the provided recording at the given playback speed.
+        
+        Once the replaying is started, it cannot be paused or stopped until
+        it is finished. All key pressed during the replay will be captured and
+        added to the end to `key_event_buffer`, which, consequently, are very 
+        likely to time out before all the key events to replay have been 
+        processed.
+
+        If it is called while playing a recording, that recording will also
+        be replayed right after the current one. This if the recording 
+        involves keys that may trigger replaying the same recording, it will
+        cause it to replay the same recording forever and normal user input 
+        
+        Raises:
+            RecordingNotExistsError: If the provided recording has not been
+                finished.
+            ValueError: If the recording does not have a start time.
+        """
+        recording.replay(keyboard=self, playback_speed=playback_speed)
 
     ################################################################
     # Internals
@@ -410,12 +459,18 @@ class Keyboard(ContextManager):
                 # Treat as individual keys
                 for char, timestamp in zip(char_buf, time_buf):
                     key = key_mappings.get(char, Key.unknown_key(char))
-                    self.key_event_buffer.put(KeyEvent(key, timestamp))
+                    key_event = KeyEvent(key, timestamp)
+                    self.key_event_buffer.put(key_event)
+                    if self.recording:
+                        self.recording.add(key_event)
             else:
                 # Return the sequence
                 key = key_mappings[seq]
                 timestamp = time_buf[0]
-                self.key_event_buffer.put(KeyEvent(key, timestamp))
+                key_event = KeyEvent(key, timestamp)
+                self.key_event_buffer.put(key_event)
+                if self.recording:
+                    self.recording.add(key_event)
             # Reached unless it is an incomplete sequence and it has not
             # yet timed out
             self.reading_seq.clear()
@@ -424,7 +479,10 @@ class Keyboard(ContextManager):
         else:
             key = key_mappings.get(starting_char, 
                                    Key.unknown_key(starting_char))
-            self.key_event_buffer.put(KeyEvent(key, starting_time))
+            key_event = KeyEvent(key, starting_time)
+            self.key_event_buffer.put(key_event)
+            if self.recording:
+                self.recording.add(key_event)
         # Reached everytime except when the sequence is incomplete.
         char_buf.clear()
         time_buf.clear()
