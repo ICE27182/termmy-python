@@ -24,6 +24,8 @@ if GETCH_TYPE == GetchType.Termios:
                                                  termios.TCSADRAIN, 
                                                  _OLD_SETTINGS)
     _read = sys.stdin.read
+elif GETCH_TYPE == GetchType.Msvcrt:
+    from msvcrt import getwch
 
 @final
 class Keyboard(ContextManager):
@@ -224,7 +226,8 @@ class Keyboard(ContextManager):
                         return None
                 key_event = self.key_event_buffer[0]
                 time_diff = time() - key_event.timestamp
-                print(f"\033[F\033[F\033[38;2;255;220;156m{time_diff:.6f}\t{str(key_event):200}")
+                # TODO Remove me
+                # print(f"\033[F\033[F\033[38;2;255;220;156m{time_diff:.6f}\t{str(key_event):200}")
                 if time_diff < 0.0:
                     # A future key event from the recording being replayed.
                     # Return None for now and return the key event later when
@@ -390,8 +393,20 @@ class Keyboard(ContextManager):
                 self._add_key_to_buffer()
 
     def _read_keyboard_msvcrt(self) -> None:
-        # TODO
-        raise NotImplementedError
+        while not self._stop_reading_keyboard.is_set():
+            # We use the blocking function here instead of checking for 
+            # `kbhit` first for consistency because both
+            # `_read_keyboard_termios` and `_read_keyboard_fallback` use
+            # blocking functions, which makes it necessary to press some
+            # extra keys to either exit the context or enter the `safe_io`
+            # context (when using `input`).
+            char = getwch()
+            timestamp = time()
+            with self.io_lock:
+                self._char_buffer.append(char)
+                self._timestamp_buffer.append(timestamp)
+                self._add_key_to_buffer()
+    
 
     def _read_keyboard_fallback(self) -> None:
        while not self._stop_reading_keyboard.is_set():

@@ -60,7 +60,8 @@ with Keyboard() as keyboard:
 
         # Controls
         key_event = keyboard.get_key_event()
-        safe_print(f"\033[F\n\033[F\033[38;2;156;220;255m{str(key_event):200}")
+        # TODO Remove me
+        # safe_print(f"\033[F\n\033[F\033[38;2;156;220;255m{str(key_event):200}")
         if key_event:
             key = key_event.key
             if key.match("escape"):

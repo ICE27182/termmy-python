@@ -28,10 +28,10 @@ def safe_io() -> Generator[None, None, None]:
         if the `Keyboard` context exits before this context exits. 
     - Using it in multiple threads will cause undefined behavior.
 
-    An extra Enter must be pressed entering the context or functions such as
-    `input` will take an empty string as its first input. This is irrelevant
-    if only output functions such as `print` or `warning` are called within
-    the context.
+    An extra Enter must be pressed when entering the context or functions
+    such as `input` will take an empty string as its first input. This is
+    irrelevant if only output functions such as `print` or `warning` are
+    called within the context.
 
     Raises:
         RuntimeError: If `safe_io` is called outside of the `Keyboard` 
