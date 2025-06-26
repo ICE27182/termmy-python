@@ -6,6 +6,10 @@ from .keyboard import Keyboard
 from typing import Literal
 from collections.abc import Generator
 from contextlib import contextmanager
+from functools import wraps
+
+import builtins
+_INPUT = builtins.input
 
 if GETCH_TYPE == GetchType.Termios:
     import termios, tty, sys
@@ -31,7 +35,8 @@ def safe_io() -> Generator[None, None, None]:
     An extra Enter must be pressed when entering the context or functions
     such as `input` will take an empty string as its first input. This is
     irrelevant if only output functions such as `print` or `warning` are
-    called within the context.
+    called within the context. Builtin `input` is overwritten within the
+    context to ensure it.
 
     Raises:
         RuntimeError: If `safe_io` is called outside of the `Keyboard` 
@@ -68,11 +73,13 @@ def safe_io() -> Generator[None, None, None]:
             if GETCH_TYPE == GetchType.Termios:
                 _set_term_default()
                 _flush_term()
+            builtins.input = _overwritten_input
             yield
         finally:
             if GETCH_TYPE == GetchType.Termios:
                 _flush_term()
                 _set_term_raw()
+            builtins.input = _INPUT
             Keyboard._active_instance._inside_safe_io = False
             return
 
@@ -99,3 +106,32 @@ def safe_print(*values: object,
                            "`safe_io` context.")
     with safe_io():
         print(*values, sep=sep, end=end, flush=flush)
+
+def wait_for_input_ready(func):
+    """Decorator that waits for input readiness before calling the function.
+
+    This prevents race conditions where the keyboard reading threads trys to
+    read the characters in the `safe_io` context while the `func` is also 
+    trying to do so . It will take effect at most once per `safe_io` context. 
+    To be exact, the first decorated function call within the `safe_io` 
+    context will wait until a key (e.g. Enter) is pressed before proceeding.
+
+    Builint `input` function is overwritten with this decorator within the
+    `safe_io` context.
+    ```python
+    @wait_for_input_ready
+    def _overwritten_input(prompt: str = "", /) -> str:
+        Keyboard._active_instance._not_blocking.wait()
+        return _INPUT(prompt)
+    ```
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if Keyboard._active_instance:
+            Keyboard._active_instance._not_blocking.wait()
+        return func(*args, **kwargs)
+    return wrapper
+
+@wait_for_input_ready
+def _overwritten_input(prompt: str = "", /) -> str:
+    return _INPUT(prompt)

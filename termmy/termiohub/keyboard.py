@@ -45,6 +45,7 @@ class Keyboard(ContextManager):
         "key_buffer_timeout",
         "sequence_timeout",
         "recording",
+        "_not_blocking",
     )
     _active_instance_lock: ClassVar[RLock] = RLock()
     _active_instance: ClassVar[Keyboard | None] = None
@@ -73,6 +74,7 @@ class Keyboard(ContextManager):
     not_reading_seq: Condition
     reading_seq: Event
     _stop_reading_keyboard: Event
+    _not_blocking: Event
 
     key_buffer_timeout: float
     sequence_timeout: float
@@ -141,6 +143,8 @@ class Keyboard(ContextManager):
         self.not_reading_seq = Condition(self.io_lock)
         self.reading_seq = Event()
         self._stop_reading_keyboard = Event()
+        self._not_blocking = Event()
+        self._not_blocking.set()
 
         self.key_buffer_timeout = key_buffer_timeout
         self.sequence_timeout = sequence_timeout
@@ -385,8 +389,10 @@ class Keyboard(ContextManager):
             # It will give a true only for the first character in the sequence
             # and even though there are still characters waiting to be read,
             # it does not give another true until another key is pressed.
+            self._not_blocking.clear()
             char = _read(1)
             timestamp = time()
+            self._not_blocking.set()
             with self.io_lock:
                 self._char_buffer.append(char)
                 self._timestamp_buffer.append(timestamp)
@@ -399,10 +405,12 @@ class Keyboard(ContextManager):
             # `_read_keyboard_termios` and `_read_keyboard_fallback` use
             # blocking functions, which makes it necessary to press some
             # extra keys to either exit the context or enter the `safe_io`
-            # context (when using `input`).
+            self._not_blocking.clear()
             char = getwch()
             timestamp = time()
+            self._not_blocking.set()
             with self.io_lock:
+
                 self._char_buffer.append(char)
                 self._timestamp_buffer.append(timestamp)
                 self._add_key_to_buffer()
@@ -410,9 +418,11 @@ class Keyboard(ContextManager):
 
     def _read_keyboard_fallback(self) -> None:
        while not self._stop_reading_keyboard.is_set():
+            self._not_blocking.clear()
             string = input()
             char = string[-1] if string else ""
             timestamp = time()
+            self._not_blocking.set()
             self.key_event_buffer.append(KeyEvent(
                 self._key_mappings.get(char, Key.unknown_key(char)),
                 timestamp,
