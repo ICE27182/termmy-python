@@ -26,17 +26,20 @@ def safe_io() -> Generator[None, None, None]:
     context. This ensures that IO operations behave the same way as
     they would outside the `Keyboard` context.
 
-    NOTE This is not thread-safe and it should only be called within the
-    `Keyboard` context. 
+    NOTE The context is not thread-safe and it should only be called within
+    the `Keyboard` context. Currently, no exception will be raised if this
+    rule is broken, but:
     - Using it in another thread will cause undefined behavior 
         if the `Keyboard` context exits before this context exits. 
-    - Using it in multiple threads will cause undefined behavior.
+    - Using it in multiple threads with the `Keyboard` activated in one
+        thread will cause undefined behavior.
 
     An extra Enter must be pressed when entering the context or functions
     such as `input` will take an empty string as its first input. This is
     irrelevant if only output functions such as `print` or `warning` are
     called within the context. Builtin `input` is overwritten within the
-    context to ensure it.
+    context to ensure it. You may need to wrap other functions such as 
+    `getpass.getpass`.
 
     Raises:
         RuntimeError: If `safe_io` is called outside of the `Keyboard` 
@@ -121,7 +124,6 @@ def wait_for_input_ready(func):
     ```python
     @wait_for_input_ready
     def _overwritten_input(prompt: str = "", /) -> str:
-        Keyboard._active_instance._not_blocking.wait()
         return _INPUT(prompt)
     ```
     """

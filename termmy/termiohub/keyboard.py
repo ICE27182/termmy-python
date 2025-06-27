@@ -320,7 +320,7 @@ class Keyboard(ContextManager):
         """Stops recording and returns the recorded KeyboardRecording.
 
         Args:
-            trim_raw_events (int): The number of raw events to remove from the
+            trim_key_events (int): The number of raw events to remove from the
                 end of the recording. Defaults to 0. This can be useful when
                 a key pressed is used to stop recording and you want to remove
                 that key press from the recording.
@@ -330,7 +330,7 @@ class Keyboard(ContextManager):
 
         Raises:
            NotRecordingError: If the keyboard is not currently recording.
-           ValueError: If trim_raw_events is negative
+           ValueError: If `trim_key_events` is negative
         """
         out = self.recording.end_recording(trim_key_events)
         self.recording = None
