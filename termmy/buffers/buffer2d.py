@@ -4,13 +4,13 @@ from __future__ import annotations
 from termmy.core import Vec2i
 from termmy.colors import Color
 from .msaa_patterns import MSAAPattern, MSAAoff, MSAAx2, MSAAx4, MSAAx8, MSAAx16
-from .text_tag import TextTag
-from typing import overload
+from typing import overload, TYPE_CHECKING
+from warnings import deprecated
 from collections.abc import Iterable, Iterator
 from abc import ABC, abstractmethod
 
-# DEBUG only used for debugging
-_text_tags: list[TextTag] = []
+if TYPE_CHECKING:
+    from .text_tag import TextTag
 
 class Buffer2D(ABC):
 
@@ -98,9 +98,9 @@ class Buffer2D(ABC):
     @overload
     def ansi_24(self) -> str: ...
     @overload
+    @deprecated("Use `Scene` instead")
     def ansi_24(self, text_tags: Iterable[TextTag]) -> str: ...
-    def ansi_24(self, 
-                          text_tags: None | Iterable[TextTag] = None) -> str:
+    def ansi_24(self, text_tags: None | Iterable[TextTag] = None) -> str:
         width, height = self.width, self.height
         str_buff = []
         if text_tags:
@@ -135,7 +135,24 @@ class Buffer2D(ABC):
                     str_buff.append("  ")
                 str_buff.append("\033[0m\n")
         return "".join(str_buff)
-                
+    
+    def draw(self, shape: "Shape"):
+        raise NotImplementedError
+    
+    def __iadd__(self, other: Buffer2D) -> Buffer2D:
+        """
+        Add the color of each pixel of another buffer to the current buffer.
+        The two buffers must have the same dimensions.
+        """
+        if self.width != other.width or self.height != other.height:
+            raise ValueError("Frame buffer dimensions do not match.")
+        width, height = self.width, self.height
+        for y in range(height):
+            for x in range(width):
+                self.add_color(x, y, other.get_color(x, y))
+        return self
+    
+    @deprecated("Use `draw` instead.")
     def draw_line(
             self, a: Vec2i, b: Vec2i, 
             color: Color | None = None,
@@ -197,6 +214,7 @@ class Buffer2D(ABC):
                 composed_color.a = alpha
                 self.add_color(x, y, composed_color)
 
+    @deprecated("Use `draw` instead.")
     def draw_rect(self, a: Vec2i, b: Vec2i, 
                   fillcolor: Color | bool = False,
                   linecolor: Color | bool = True) -> None:
@@ -235,6 +253,7 @@ class Buffer2D(ABC):
                 for x in range(x_min + 1, x_max):
                     self.add_color(x, y, fillcolor)
 
+    @deprecated("Use `draw` instead.")
     def draw_triangle(self, a: Vec2i, b: Vec2i, c: Vec2i, 
                       fillcolor: Color | bool = False,
                       linecolor: Color | bool = True,
@@ -282,6 +301,7 @@ class Buffer2D(ABC):
             self.draw_line(b, c, linecolor, msaa)
             self.draw_line(c, a, linecolor, msaa)
     
+    @deprecated("Use `draw` instead.")
     def _fill_triangle_flat(self, a: Vec2i, b: Vec2i,
                             c: Vec2i, fillcolor: Color,
                             msaa: MSAAPattern) -> None:
@@ -328,18 +348,3 @@ class Buffer2D(ABC):
             composed_color_right.a = alpha_right
             self.add_color(x_left, y, composed_color_left)
             self.add_color(x_right, y, composed_color_right)
-
-    def __iadd__(self, other: Buffer2D) -> Buffer2D:
-        """
-        Add the color of each pixel of another buffer to the current buffer.
-        The two buffers must have the same dimensions.
-        """
-        if self.width != other.width or self.height != other.height:
-            raise ValueError("Frame buffer dimensions do not match.")
-        width, height = self.width, self.height
-        for y in range(height):
-            for x in range(width):
-                self.add_color(x, y, other.get_color(x, y))
-        return self
-
-        

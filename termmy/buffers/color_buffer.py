@@ -3,31 +3,53 @@
 from __future__ import annotations
 from termmy.colors import Color
 from .buffer2d import Buffer2D
-from .text_tag import TextTag
 
 from typing import override, overload, TYPE_CHECKING
 from collections.abc import Iterable
 from copy import copy
 from itertools import islice
+from warnings import deprecated
+from array import array
 
 if TYPE_CHECKING:
     from termmy.display import DisplaySettings
+    from .text_tag import TextTag
+
 
 
 class ColorBuffer(Buffer2D):
     __slots__ = ("width", "height", "data", "format_str")
     def __init__(self, width: int, height: int,
-                 data: tuple[Color, ...]|None = None):
+                 data: tuple[Color] | None = None):
         """
-        `width` and `height` should be positive integers.
+        Args:
+            width (int): The width of the buffer. Must be a positive integer.
+            height (int): The height of the buffer. Must be a positive 
+                integer.
+            data (tuple[Color] | None): The initial data for the buffer. If 
+                provided, it must be a tuple of `Color` objects with a length
+                equal to `width * height`. If not provided, the buffer will be
+                initialized with default `Color` objects.
+        Raises:
+            ValueError: If `width` or `height` are not positive integers.
+            ValueError: If `data` is provided and its length is not equal to
+                `width * height`.
         """
+        if width <= 0 or height <= 0:
+            raise ValueError("Width and height must be positive integers."
+                             f"Got {width=}, {height=}")
+        if data and len(data) != width * height:
+            raise ValueError("Data length must be equal to width * height.")
         self.width = width
         self.height = height
         self.data = data or tuple(Color() for _ in range(width*height))
-        self.format_str = ("\033[48;2;%d;%d;%dm  " * width) + "\033[0m\n"
+        self.format_str = f"{"\033[48;2;%d;%d;%dm  " * width}\033[0m\n"
 
     @classmethod
-    def from_display_settings(cls, display_settings: DisplaySettings) -> ColorBuffer:
+    def from_display_settings(
+        cls, 
+        display_settings: DisplaySettings
+    ) -> ColorBuffer:
         return cls(width=display_settings.width, 
                    height=display_settings.height)
 
@@ -49,42 +71,56 @@ class ColorBuffer(Buffer2D):
         for pixel_color in self.data:
             pixel_color += color
         return self
-
-    @overload
-    def ansi_24(self) -> str: ...
-    @overload
-    def ansi_24(self, text_tags: Iterable[TextTag]) -> str: ...
     
     @override
-    def get_color(self, x:int, y:int) -> Color:
-        """
-        Return a new Color object at (x, y).
+    def get_color(self, x: int, y: int) -> Color:
+        """Get the color at (x, y). 
 
-        The return value is not a reference to the pixel stored in the buffer.
+        Args:
+            x (int): The horizontal coordinate of the pixel.
+            y (int): The vertical coordinate of the pixel.
 
-        Performs bounds checking.
+        Returns:
+            Color: A new Color object at (x, y).
+
+        Raises:
+            IndexError: If `x` or `y` are out of bounds.
         """
         return self.get(x, y)
 
     @override
-    def set_color(self, x:int, y:int, color: Color) -> Buffer2D:
-        """
-        Set the given color at (x, y). 
-        
-        The color will not be a reference to the argument.
+    def set_color(self, x: int, y: int, color: Color) -> Buffer2D:
+        """Set the color at (x, y) to `color`. 
 
-        Performs bounds checking.
+        Args:
+            x (int): The horizontal coordinate of the pixel.
+            y (int): The vertical coordinate of the pixel.
+            color (Color): The new color to be set at (x, y).
+        
+        Returns:
+            Buffer2D: The Buffer2D object itself
+
+        Raises:
+            IndexError: If `x` or `y` are out of bounds.
         """
         return self.set(x, y, color)
 
     @override
-    def add_color(self, x:int, y:int, color: Color) -> Buffer2D:
-        """
-        Add the given color to (x, y). 
-        
+    def add_color(self, x: int, y: int, color: Color) -> Buffer2D:
+        """Add the given color to (x, y).
+
         The color will not be a reference to the argument.
 
-        Performs bounds checking.
+        Args:
+            x (int): The horizontal coordinate of the pixel.
+            y (int): The vertical coordinate of the pixel.
+            color (Color): The color to add to the pixel at (x, y).
+
+        Returns:
+            Buffer2D: The Buffer2D object itself.
+
+        Raises:
+            IndexError: If `x` or `y` are out of bounds.
         """
         if not (0 <= x < self.width and 0 <= y < self.height):
             raise IndexError("x or y out of bounds. "
@@ -93,26 +129,41 @@ class ColorBuffer(Buffer2D):
         base_color = self.data[y*self.width + x]
         base_color += color
         return self
-    
+
     @override
-    def get(self, x:int, y:int) -> Color:
-        """
-        Get the color at (x, y). 
-        
-        Performs bounds checking.
+    def get(self, x: int, y: int) -> Color:
+        """Get the color at (x, y).
+
+        Args:
+            x (int): The horizontal coordinate of the pixel.
+            y (int): The vertical coordinate of the pixel.
+
+        Returns:
+            Color: A new Color object at (x, y).
+
+        Raises:
+            IndexError: If `x` or `y` are out of bounds.
         """
         if not (0 <= x < self.width and 0 <= y < self.height):
             raise IndexError("x or y out of bounds. "
                              f"Expected 0 <= x < {self.width} and 0 <= y < {self.height}, "
                              f"but got x={x}, y={y}.")
         return copy(self.data[y*self.width + x])
-    
+
     @override
-    def set(self, x:int, y:int, color: Color) -> Buffer2D:
-        """
-        Set the color at (x, y). 
-        
-        Performs bounds checking.
+    def set(self, x: int, y: int, color: Color) -> Buffer2D:
+        """Set the color at (x, y).
+
+        Args:
+            x (int): The horizontal coordinate of the pixel.
+            y (int): The vertical coordinate of the pixel.
+            color (Color): The new color to be set at (x, y).
+
+        Returns:
+            Buffer2D: The Buffer2D object itself.
+
+        Raises:
+            IndexError: If `x` or `y` are out of bounds.
         """
         if not (0 <= x < self.width and 0 <= y < self.height):
             raise IndexError("x or y out of bounds. "
@@ -123,11 +174,20 @@ class ColorBuffer(Buffer2D):
         base_color.g = color.g
         base_color.b = color.b
         return self
+    
+    @override
+    def ansi_24(self) -> str:
+        """Return an ANSI 24-bit color string representation of the buffer.
+
+        Returns:
+            str: The ANSI string representing the buffer.
+        """
+    @override
+    @deprecated("Use `Scene` instead")
+    def ansi_24(self, text_tags: TextTag) -> str: ...
 
     @override
-    def ansi_24(self, text_tags: None | Iterable[TextTag] = None) -> str:
-        """
-        """
+    def ansi_24(self, text_tags = None) -> str:
         if not text_tags:
             str_buf = []
             width = self.width

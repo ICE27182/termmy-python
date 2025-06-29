@@ -26,7 +26,7 @@ class Color:
             self.r*a_ + other.r*a,
             self.g*a_ + other.g*a,
             self.b*a_ + other.b*a,
-            1.0
+            a
         )
     def __iadd__(self, other: Self) -> Self:
         a = other.a
@@ -34,7 +34,7 @@ class Color:
         self.r = self.r*a_ + other.r*a
         self.g = self.g*a_ + other.g*a
         self.b = self.b*a_ + other.b*a
-        self.a = 1.0
+        self.a = a
         return self
     
     def illuminance(self) -> float:

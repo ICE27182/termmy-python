@@ -1,1 +1,1 @@
-from buffer_benchmark import *
+from .buffer_benchmark import *
