@@ -1,32 +1,36 @@
 # termmy
 termmy is a pure python library that provide APIs for GUI in the terminals.
+It aims for minimal overhead and maximum cross-platform compatibility.
+Note that being a pure python library that runs in a terminal, 
+it inevitably has considerable overhead comparing to a industry-standard GUI library.
+It also has limited support for input depending on platforms.
+
+It is mainly for fun and learning purposes.
 
 ## Major Features
 
 ### display
 This function displays Buffer2D instances to the terminal.
 
-### Buffer2D
-An abstract class that can be inherited from for 2 dimensional buffers 
-like color buffers, normal buffers, depth buffers, etc.
-#### ColorBuffer
-A class inheriting from Buffer2D for 2 dimensional image representation. Supports
-high precision RGBA information storage.
+### ColorBuffer
+- Provide pixel-level control over the output of the terminal.
+
+### Scene
+- Allows for usages of nodes.
 
 ### Image
-Supports image decoding/encoding. 
-Compositioned a ColorBuffer internally for data storage.
+- Supports image decoding/encoding.
 
 ### Text
-Supports normal terminal text (Overlay only) 
-and text rendering to a Buffer2D object.
-(Partially) supports different typography.
+- Supports text rendering with typography.
 
-### Overlay
-Stores overlaid text and geometries on top of the buffer to be displayed.
+### TermIOHub
+- Reads keyboard inputs, interpret control sequence if possible. 
+- Records and replays keyboard input.
+- Provide context in which default IO behaviors are preserved 
+  while keyboard is being read.
 
-### TermHub
-Reads keyboard inputs, interpret control sequence if possible. 
-Records and replays keyboard input.
-Provide print and input 
-(Default print and input may not work properly due to the need of keyboard reading)
+## 
+In order to mitigate the overhead, it is recommended to operate on the 
+attributes directly instead of using equivlent methods where performance is of
+concern.

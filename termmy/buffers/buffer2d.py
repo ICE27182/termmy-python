@@ -134,6 +134,7 @@ class Buffer2D(ABC):
                     str_buff.append(self.get_color(x, y).to_ansi_bgd_24())
                     str_buff.append("  ")
                 str_buff.append("\033[0m\n")
+        str_buff.pop() # Remove the last newline character
         return "".join(str_buff)
     
     def draw(self, shape: "Shape"):

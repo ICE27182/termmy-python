@@ -7,6 +7,7 @@
 
 from .core import *
 from .buffers import *
+from .graphics import *
 from .display import *
 from .colors import *
 from .images import *

@@ -56,9 +56,9 @@ class ColorBuffer(Buffer2D):
     @override
     def clear(self) -> None:
         for color in self.data:
-            color.r = 0
-            color.g = 0
-            color.b = 0
+            color.r = 0.0
+            color.g = 0.0
+            color.b = 0.0
 
     @override
     def fill(self, color: Color | None = None) -> Buffer2D:
@@ -69,7 +69,10 @@ class ColorBuffer(Buffer2D):
         """
         color = color or Color(1.0, 1.0, 1.0, 1.0)
         for pixel_color in self.data:
-            pixel_color += color
+            pixel_color.r = color.r
+            pixel_color.g = color.g
+            pixel_color.b = color.b
+            pixel_color.a = color.a
         return self
     
     @override
@@ -200,7 +203,7 @@ class ColorBuffer(Buffer2D):
                         for color in islice(self.data, y*width, (y+1)*width)
                     )
                 )
-            return "\033[0m\n".join(str_buf) + "\033[0m\n"
+            return f"{"\033[0m\n".join(str_buf)}\033[0m"
         else:
             return super().ansi_24(text_tags)
     

@@ -9,11 +9,11 @@ from termmy.termiohub import safe_print
 from typing import Any, overload, Callable
 
 @overload
-def display(frame_buffer: Buffer2D) -> None: ...
+def display(buffer: Buffer2D) -> None: ...
 @overload
 def display(
-    frame_buffer: Buffer2D,
-    color_settings: DisplaySettings = DisplaySettings.auto_detecting(),
+    buffer: Buffer2D,
+    display_settings: DisplaySettings = DisplaySettings.auto_detecting(),
     go_back_to_top: bool = False,
     tone_mapping: Callable[[float], float] | None = None
 ) -> None: ...
