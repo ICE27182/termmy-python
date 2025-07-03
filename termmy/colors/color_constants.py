@@ -2,41 +2,8 @@
 
 from .color import Color
 
-CLEAR_COLOR = "\033[0m"
-
-BLACK_CHAR = "\033[30m"
-BLACK_BG = "\033[40m"
-RED_CHAR = "\033[31m"
-RED_BG = "\033[41m"
-GREEN_CHAR = "\033[32m"
-GREEN_BG = "\033[42m"
-YELLOW_CHAR = "\033[33m"
-YELLOW_BG = "\033[43m"
-BLUE_CHAR = "\033[34m"
-BLUE_BG = "\033[44m"
-MAGENTA_CHAR = "\033[35m"
-MAGENTA_BG = "\033[45m"
-CYAN_CHAR = "\033[36m"
-CYAN_BG = "\033[46m"
-WHITE_CHAR = "\033[37m"
-WHITE_BG = "\033[47m"
-
-BLACK_BRIGHT_CHAR = "\033[90m"
-BLACK_BRIGHT_BG = "\033[100m"
-RED_BRIGHT_CHAR = "\033[91m"
-RED_BRIGHT_BG = "\033[101m"
-GREEN_BRIGHT_CHAR = "\033[92m"
-GREEN_BRIGHT_BG = "\033[102m"
-YELLOW_BRIGHT_CHAR = "\033[93m"
-YELLOW_BRIGHT_BG = "\033[103m"
-BLUE_BRIGHT_CHAR = "\033[94m"
-BLUE_BRIGHT_BG = "\033[104m"
-MAGENTA_BRIGHT_CHAR = "\033[95m"
-MAGENTA_BRIGHT_BG = "\033[105m"
-CYAN_BRIGHT_CHAR = "\033[96m"
-CYAN_BRIGHT_BG = "\033[106m"
-WHITE_BRIGHT_CHAR = "\033[97m"
-WHITE_BRIGHT_BG = "\033[107m"
+# FIXME tuple[Color] Color is mutable. Unsafe globals. Use a function/method
+# to return them.
 
 # https://en.wikipedia.org/wiki/ANSI_escape_code
 # Average of the following 5 color configs

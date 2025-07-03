@@ -16,24 +16,42 @@ class Color:
         return cls(r/255, g/255, b/255, a/255)
     
     @classmethod
+    def from_hex(cls, hex: str) -> Color:
+        if len(hex) == 0:
+            raise ValueError(f"Invalid hex color. Got {hex=}")
+        if hex[0] == "#":
+            hex = hex[1:]
+        if len(hex) in (3, 4):
+            hex = "".join("%sF" % h for h in hex)
+        elif len(hex) not in (6, 8):
+            raise ValueError(f"Invalid hex color. Got {hex=}")
+        return cls.from_ints(int(hex[0:2], base=16),
+                                 int(hex[2:4], base=16),
+                                 int(hex[4:6], base=16),
+                                 int(hex[6:8], base=16) if len(hex) == 8 
+                                 else 255)
+    
+    @classmethod
     def from_illuminance(cls, illum: float, alpha: float = 1.0) -> Color:
         return cls(illum, illum, illum, alpha)
     
-    def __add__(self, other: Self) -> Self:
-        a = other.a
+    @classmethod
+    def blended(cls, original: Self, over: Self)  -> Color:
+        a = over.a
         a_ = 1.0 - a
-        return Color(
-            self.r*a_ + other.r*a,
-            self.g*a_ + other.g*a,
-            self.b*a_ + other.b*a,
-            a
+        return cls(
+            original.r*a_ + over.r*a,
+            original.g*a_ + over.g*a,
+            original.b*a_ + over.b*a,
+            a,
         )
-    def __iadd__(self, other: Self) -> Self:
-        a = other.a
+    
+    def blend_over(self, over: Self)  -> Self:
+        a = over.a
         a_ = 1.0 - a
-        self.r = self.r*a_ + other.r*a
-        self.g = self.g*a_ + other.g*a
-        self.b = self.b*a_ + other.b*a
+        self.r = self.r*a_ + over.r*a
+        self.g = self.g*a_ + over.g*a
+        self.b = self.b*a_ + over.b*a
         self.a = a
         return self
     

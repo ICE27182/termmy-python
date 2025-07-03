@@ -23,8 +23,8 @@ ICE = Color.from_ints(156, 220, 255, 127)
 
 display_settings = DisplaySettings.auto_detecting(ensure_lookup_exsits=True)
 # display_settings.inverse = True
-scene = ColorBuffer(WIDTH, HEIGHT)
-# scene = ColorBuffer.from_display_settings(display_settings)
+base = ColorBuffer(WIDTH, HEIGHT)
+# base = ColorBuffer.from_display_settings(display_settings)
 # display_settings.multisampling = MSAAoff
 # display_settings.set_color_mode(ColorMode.ANSI256)
 # display_settings.resize_mode = ResizeMode.AsIs
@@ -32,15 +32,15 @@ scene = ColorBuffer(WIDTH, HEIGHT)
 print(display_settings)
 
 def default():
-    scene.fill()
-    scene.draw_line(Vec2i(30, 30), Vec2i(16, 5))
-    scene.draw_line(Vec2i(10, 30), Vec2i(60, 5), 
+    base.fill()
+    base.draw_line(Vec2i(30, 30), Vec2i(16, 5))
+    base.draw_line(Vec2i(10, 30), Vec2i(60, 5), 
                         color=Color.from_ints(156, 220, 255),
                         # msaa=MSAAoff,
                         )
-    scene.draw_rect(Vec2i(15, 15), Vec2i(27, 27), fillcolor=True)
-    scene.set_color(61, 8, Color.from_ints(255, 0, 0))
-    scene.draw_triangle(Vec2i(4, 4), Vec2i(20, 28), Vec2i(52, 15), 
+    base.draw_rect(Vec2i(15, 15), Vec2i(27, 27), fillcolor=True)
+    base.set_color(61, 8, Color.from_ints(255, 0, 0))
+    base.draw_triangle(Vec2i(4, 4), Vec2i(20, 28), Vec2i(52, 15), 
                             fillcolor=True)
 default()
 
@@ -52,11 +52,10 @@ recording = None
 clear()
 with Keyboard() as keyboard:
     while True:
-        scene.fill(Color(random()*0.95, random(), random(), 0.01))
         if keyboard.is_recording():
-            scene.add_color(4, 4, Color(r=1.0))
+            base.blend_color(4, 4, Color(r=1.0))
         else:
-            scene.add_color(4, 4, Color(g=1.0))
+            base.blend_color(4, 4, Color(g=1.0))
 
         # Controls
         key_event = keyboard.get_key_event()
@@ -70,9 +69,9 @@ with Keyboard() as keyboard:
                 break
             # Canvas
             elif key.match("F"):
-                scene.fill()
+                base.fill()
             elif key.match("f"):
-                scene.fill(current_color)
+                base.fill(current_color)
             elif key.match(" "):
                 default()
                 pos = Vec2i(WIDTH // 2, HEIGHT // 2)
@@ -85,33 +84,33 @@ with Keyboard() as keyboard:
             
             # Movement
             elif key.match("up") or key.match("w"):
-                scene.set_color(pos.x, pos.y, current_color)
+                base.set_color(pos.x, pos.y, current_color)
                 pos.y = (pos.y - 1) % HEIGHT
-                scene.set_color(pos.x, pos.y, ICE)
+                base.set_color(pos.x, pos.y, ICE)
             elif key.match("down") or key.match("s"):
-                scene.set_color(pos.x, pos.y, current_color)
+                base.set_color(pos.x, pos.y, current_color)
                 pos.y = (pos.y + 1) % HEIGHT
-                scene.set_color(pos.x, pos.y, ICE)
+                base.set_color(pos.x, pos.y, ICE)
             elif key.match("left") or key.match("a"):
-                scene.set_color(pos.x, pos.y, current_color)
+                base.set_color(pos.x, pos.y, current_color)
                 pos.x = (pos.x - 1) % WIDTH
-                scene.set_color(pos.x, pos.y, ICE)
+                base.set_color(pos.x, pos.y, ICE)
             elif key.match("right") or key.match("d"):
-                scene.set_color(pos.x, pos.y, current_color)
+                base.set_color(pos.x, pos.y, current_color)
                 pos.x = (pos.x + 1) % WIDTH
-                scene.set_color(pos.x, pos.y, ICE)
+                base.set_color(pos.x, pos.y, ICE)
 
             # Geomerties
             elif key.match("l"):
                 line.append(copy(pos))
-                scene.set_color(pos.x, pos.y, Color(1, 0, 0, 1))
+                base.set_color(pos.x, pos.y, Color(1, 0, 0, 1))
             elif key.match("L"):
-                scene.draw_line(line[0], line[1], Color(0,0,0,1))
+                base.draw_line(line[0], line[1], Color(0,0,0,1))
             elif key.match("t"):
                 triangle.append(copy(pos))
-                scene.set_color(pos.x, pos.y, Color(1, 0, 0, 1))
+                base.set_color(pos.x, pos.y, Color(1, 0, 0, 1))
             elif key.match("T"):
-                scene.draw_triangle(triangle[0], triangle[1], triangle[2], True)
+                base.draw_triangle(triangle[0], triangle[1], triangle[2], True)
 
             # Commands
             elif key.match("/"):
@@ -162,12 +161,12 @@ with Keyboard() as keyboard:
                 with safe_io():
                     clear()
                     print(f"{recording}")
-                    print("-"*scene.width)
+                    print("-"*base.width)
                     print(f"{keyboard.key_event_buffer=}")
                     getch()
         
         if 1:
-            display(scene, display_settings, go_back_to_top=True)
+            display(base, display_settings, go_back_to_top=True)
         else:
             sleep(1.0/90.0)
-            safe_print(scene.ansi_24(), end="\033[F"*(HEIGHT))
+            safe_print(base.ansi_24(), end="\033[F"*(HEIGHT))

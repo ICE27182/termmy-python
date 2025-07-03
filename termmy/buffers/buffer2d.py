@@ -49,34 +49,56 @@ class Buffer2D(ABC):
 
     @abstractmethod
     def get_color(self, x:int, y:int) -> Color:
-        """
-        Return a new Color object at (x, y).
+        """Get the color at (x, y). 
 
-        The return value is not a reference to the pixel stored in the buffer.
+        Args:
+            x (int): The horizontal coordinate of the pixel.
+            y (int): The vertical coordinate of the pixel.
 
-        Non-color derived classes should return a Color based on class 
-        specific rules.
+        Returns:
+            Color: A new Color object at (x, y). 
+                If it is not a buffer for colors, the value will be
+                converted to a color depending on the implementations.
+
+        Raises:
+            IndexError: If `x` or `y` are out of bounds.
         """
     
     @abstractmethod
     def set_color(self, x:int, y:int, color: Color) -> Buffer2D:
-        """
-        Set the given color at (x, y). 
-        
-        The color will not be a reference to the argument.
+        """Set the color at (x, y) to `color`. 
 
-        Non-color derived classes should should set its value(s) based on
-        class specific rules.
+        Args:
+            x (int): The horizontal coordinate of the pixel.
+            y (int): The vertical coordinate of the pixel.
+            color (Color): The new color to be set at (x, y).
+                If it is not a buffer for colors, the color will be
+                converted depending on the implementations.
+        
+        Returns:
+            Buffer2D: The Buffer2D object itself.
+
+        Raises:
+            IndexError: If `x` or `y` are out of bounds.
         """
     
-    @abstractmethod
-    def add_color(self, x:int, y:int, color: Color) -> Buffer2D:
-        """
-        Add the given color to the color at (x, y) with transparency.
+    def blend_color(self, x:int, y:int, color: Color) -> Buffer2D:
+        """blend the given color over (x, y).
 
-        Non-color derived classes should should set its value(s) based on
-        class specific rules.
+        Args:
+            x (int): The horizontal coordinate of the pixel.
+            y (int): The vertical coordinate of the pixel.
+            color (Color): The color to add to the pixel at (x, y).
+                If it is not a buffer for colors, the value and color will
+                be converted depending on the implementations.
+
+        Returns:
+            Buffer2D: The Buffer2D object itself.
+
+        Raises:
+            IndexError: If `x` or `y` are out of bounds.
         """
+        return self.set_color(x, y, self.get_color(x, y).blend_over(color))
     
     @abstractmethod
     def get(self, x: int, y: int) -> object:
@@ -137,22 +159,6 @@ class Buffer2D(ABC):
         str_buff.pop() # Remove the last newline character
         return "".join(str_buff)
     
-    def draw(self, shape: "Shape"):
-        raise NotImplementedError
-    
-    def __iadd__(self, other: Buffer2D) -> Buffer2D:
-        """
-        Add the color of each pixel of another buffer to the current buffer.
-        The two buffers must have the same dimensions.
-        """
-        if self.width != other.width or self.height != other.height:
-            raise ValueError("Frame buffer dimensions do not match.")
-        width, height = self.width, self.height
-        for y in range(height):
-            for x in range(width):
-                self.add_color(x, y, other.get_color(x, y))
-        return self
-    
     @deprecated("Use `draw` instead.")
     def draw_line(
             self, a: Vec2i, b: Vec2i, 
@@ -187,13 +193,13 @@ class Buffer2D(ABC):
                 for x in range(x_min, x_max + 1):
                     y = round(k * x + bias)
                     if 0 <= y < height:
-                        composed_color = self.get_color(x, y) + color
+                        composed_color = Color.blended(self.get_color(x, y), color)
                         alpha = 0.0 if msaa else 1.0
                         for dx, dy in msaa:
                             diff = abs(y + dy - k * (x + dx) - bias)
                             alpha += msaa_weight * (1.0 - diff) if diff < 1.0 else 0.0
                         composed_color.a = alpha
-                        self.add_color(x, y, composed_color)
+                        self.blend_color(x, y, composed_color)
                 return
             else:
                 t = 1 / k
@@ -207,13 +213,13 @@ class Buffer2D(ABC):
         for y in range(y_min, y_max + 1):
             x = round(t * y + bias)
             if 0 <= x < width:
-                composed_color = self.get_color(x, y) + color
+                composed_color = Color.blended(self.get_color(x, y), color)
                 alpha = 0.0 if msaa else 1.0
                 for dx, dy in msaa:
                     diff = abs(x + dx - t*(y + dy) - bias)
                     alpha += msaa_weight * (1.0 - diff) if diff < 1.0 else 0.0
                 composed_color.a = alpha
-                self.add_color(x, y, composed_color)
+                self.blend_color(x, y, composed_color)
 
     @deprecated("Use `draw` instead.")
     def draw_rect(self, a: Vec2i, b: Vec2i, 
@@ -243,16 +249,16 @@ class Buffer2D(ABC):
         if linecolor:
             for x in range(x_min, x_max + 1):
                 if 0 <= x < width:
-                    self.add_color(x, y_min, linecolor)
-                    self.add_color(x, y_max, linecolor)
+                    self.blend_color(x, y_min, linecolor)
+                    self.blend_color(x, y_max, linecolor)
             for y in range(y_min, y_max): # not need to + 1
                 if 0 <= y < height:
-                    self.add_color(x_min, y, linecolor)
-                    self.add_color(x_max, y, linecolor)
+                    self.blend_color(x_min, y, linecolor)
+                    self.blend_color(x_max, y, linecolor)
         if fillcolor:
             for y in range(y_min + 1, y_max):
                 for x in range(x_min + 1, x_max):
-                    self.add_color(x, y, fillcolor)
+                    self.blend_color(x, y, fillcolor)
 
     @deprecated("Use `draw` instead.")
     def draw_triangle(self, a: Vec2i, b: Vec2i, c: Vec2i, 
@@ -332,10 +338,10 @@ class Buffer2D(ABC):
             x_right = x_right if x_right < width else width - 1
             # Going from the left edge of the triangle to the right edge
             for x in range(x_left + 1, x_right):
-                self.add_color(x, y, fillcolor)
+                self.blend_color(x, y, fillcolor)
             
-            composed_color_left = self.get_color(x_left, y) + fillcolor
-            composed_color_right = self.get_color(x_right, y) + fillcolor
+            composed_color_left = Color.blended(self.get_color(x_left, y), fillcolor)
+            composed_color_right = Color.blended(self.get_color(x_right, y), fillcolor)
             alpha_left = 0.0 if msaa else 1.0
             alpha_right = 0.0 if msaa else 1.0
             for dx, dy in msaa:
@@ -347,5 +353,5 @@ class Buffer2D(ABC):
                                if diff_right < 1.0 else 0.0)
             composed_color_left.a = alpha_left
             composed_color_right.a = alpha_right
-            self.add_color(x_left, y, composed_color_left)
-            self.add_color(x_right, y, composed_color_right)
+            self.blend_color(x_left, y, composed_color_left)
+            self.blend_color(x_right, y, composed_color_right)

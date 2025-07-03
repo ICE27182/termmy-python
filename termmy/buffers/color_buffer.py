@@ -9,7 +9,6 @@ from collections.abc import Iterable
 from copy import copy
 from itertools import islice
 from warnings import deprecated
-from array import array
 
 if TYPE_CHECKING:
     from termmy.display import DisplaySettings
@@ -19,6 +18,12 @@ if TYPE_CHECKING:
 
 class ColorBuffer(Buffer2D):
     __slots__ = ("width", "height", "data", "format_str")
+    
+    width: int
+    height: int
+    data: tuple[Color]
+    format_str: str
+
     def __init__(self, width: int, height: int,
                  data: tuple[Color] | None = None):
         """
@@ -92,7 +97,7 @@ class ColorBuffer(Buffer2D):
         return self.get(x, y)
 
     @override
-    def set_color(self, x: int, y: int, color: Color) -> Buffer2D:
+    def set_color(self, x: int, y: int, color: Color) -> ColorBuffer:
         """Set the color at (x, y) to `color`. 
 
         Args:
@@ -101,7 +106,7 @@ class ColorBuffer(Buffer2D):
             color (Color): The new color to be set at (x, y).
         
         Returns:
-            Buffer2D: The Buffer2D object itself
+            ColorBuffer: The ColorBuffer object itself
 
         Raises:
             IndexError: If `x` or `y` are out of bounds.
@@ -109,10 +114,8 @@ class ColorBuffer(Buffer2D):
         return self.set(x, y, color)
 
     @override
-    def add_color(self, x: int, y: int, color: Color) -> Buffer2D:
+    def blend_color(self, x: int, y: int, color: Color) -> ColorBuffer:
         """Add the given color to (x, y).
-
-        The color will not be a reference to the argument.
 
         Args:
             x (int): The horizontal coordinate of the pixel.
@@ -120,7 +123,7 @@ class ColorBuffer(Buffer2D):
             color (Color): The color to add to the pixel at (x, y).
 
         Returns:
-            Buffer2D: The Buffer2D object itself.
+            ColorBuffer: The ColorBuffer object itself.
 
         Raises:
             IndexError: If `x` or `y` are out of bounds.
@@ -130,7 +133,7 @@ class ColorBuffer(Buffer2D):
                              f"Expected 0 <= x < {self.width} and 0 <= y < {self.height}, "
                              f"but got x={x}, y={y}.")
         base_color = self.data[y*self.width + x]
-        base_color += color
+        base_color.blend_over(color)
         return self
 
     @override
@@ -154,7 +157,7 @@ class ColorBuffer(Buffer2D):
         return copy(self.data[y*self.width + x])
 
     @override
-    def set(self, x: int, y: int, color: Color) -> Buffer2D:
+    def set(self, x: int, y: int, color: Color) -> ColorBuffer:
         """Set the color at (x, y).
 
         Args:
@@ -163,7 +166,7 @@ class ColorBuffer(Buffer2D):
             color (Color): The new color to be set at (x, y).
 
         Returns:
-            Buffer2D: The Buffer2D object itself.
+            ColorBuffer: The ColorBuffer object itself.
 
         Raises:
             IndexError: If `x` or `y` are out of bounds.
