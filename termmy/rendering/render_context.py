@@ -10,3 +10,4 @@ class RenderContext:
     height: int
     color_buffer: ColorBuffer
     ms_buffer: MultisampleColorBuffer | None = None
+    scratch_buffer: ColorBuffer | None = None
