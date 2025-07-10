@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from .buffer2d import Buffer2D
 from .color_buffer import ColorBuffer
-from ..rendering.anti_aliasing import MSAA, MSAAx4
 from ..colors import Color, Colors
 
 from typing import override, overload, TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from ..rendering import MSAA, MSAAx4
 
 class MultisampleColorBuffer(Buffer2D):
     __slots__ = ("width", "height", "msaa", "data", "format_str")
@@ -48,7 +49,22 @@ class MultisampleColorBuffer(Buffer2D):
         self.data = data or tuple(Color() for _ in range(width*height*len(msaa)))
         self.format_str = f"{"\033[48;2;%d;%d;%dm  " * width}\033[0m\n"
     
-    def resolve(self) -> ColorBuffer:
+    def resolve_to(self, buffer: ColorBuffer) -> ColorBuffer:
+        """Resolve the buffer to the color buffer passed in.
+
+        Returns:
+            ColorBuffer: A reference to the buffer passed in.
+        
+        Raises:
+            ValueError: If the dimensions of the buffer passed in do not match
+                the dimensions of this buffer.
+        """
+        if self.width != buffer.width or self.height != buffer.height:
+            raise ValueError("Dimensions of the buffer passed in do not "
+                             "match. The `MultisampleColorBuffer` has "
+                             f"dimensions of {self.width}x{self.height}, and "
+                             "the target buffer has dimensions of "
+                             f"{buffer.width}x{buffer.height}")
         raise NotImplementedError
 
     @override

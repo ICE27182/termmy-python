@@ -4,11 +4,10 @@ from .color import Color
 
 from random import random
 from random import seed as seed_
+from typing import final
 
+@final
 class Colors:
-    """
-    Color constants
-    """
     @staticmethod
     def black() -> Color:
         return Color(0.0, 0.0, 0.0)
