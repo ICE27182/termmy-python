@@ -1,7 +1,7 @@
 
 
+from .type_aliases import NormFloat
 from dataclasses import dataclass
-from .type_aliases import AbsoFloat, NormFloat
 
 @dataclass(slots=True)
 class Vec2i:
