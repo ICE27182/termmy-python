@@ -4,13 +4,23 @@ from .vec3 import Vec3
 from .matrix import Matrix
 
 from collections.abc import Iterable
-from typing import Self
+from typing import Self, Final
 from math import sin, cos
 
-class Matrix3x3(Matrix):
+class Mat3(Matrix):
     __slots__ = ["a11", "a12", "a13", "a21", "a22", "a23", "a31", "a32", "a33"]
+    _dimension: Final[int] = 3
+    a11: float
+    a12: float
+    a13: float
+    a21: float
+    a22: float
+    a23: float
+    a31: float
+    a32: float
+    a33: float
 
-    def __init__(self, data=Iterable) -> None:
+    def __init__(self, data: Iterable[float]) -> None:
         if len(data) != 9:
             raise ValueError(f"`len(data)` must be 9. Got {len(data)}")
         self.a11, self.a12, self.a13, self.a21, self.a22, self.a23, self.a31, self.a32, self.a33 = data
@@ -23,15 +33,52 @@ class Matrix3x3(Matrix):
             self.a31 == mat.a31 and self.a32 == mat.a32 and self.a33 == mat.a33
         )
     
+    @property
+    def _data(self) -> list[float]:
+        return [self.a11, self.a12, self.a13,
+                self.a21, self.a22, self.a23,
+                self.a31, self.a32, self.a33]
+    
     @classmethod
     def get_identity_matrix(cls) -> Self:
         return cls(
-            (
+            [
                 1, 0, 0,
                 0, 1, 0,
                 0, 0, 1,
-            )
+            ]
         )
+    
+    @classmethod
+    def rotationX(cls, theta: float) -> Self:
+        """Rotation matrix around the X-axis of angle `theta` (in radians)."""
+        cos_theta = cos(theta)
+        sin_theta = sin(theta)
+        return cls([
+            1, 0, 0,
+            0, cos_theta, -sin_theta,
+            0, sin_theta, cos_theta,
+        ])
+    @classmethod
+    def rotationY(cls, theta: float) -> Self:
+        """Rotation matrix around the Y-axis of angle `theta` (in radians)."""
+        cos_theta = cos(theta)
+        sin_theta = sin(theta)
+        return cls([
+            cos_theta, 0, sin_theta,
+            0, 1, 0,
+            -sin_theta, 0, cos_theta,
+        ])
+    @classmethod
+    def rotationZ(cls, theta: float) -> Self:
+        """Rotation matrix around the Z-axis of angle `theta` (in radians)."""
+        cos_theta = cos(theta)
+        sin_theta = sin(theta)
+        return cls([
+            cos_theta, -sin_theta, 0,
+            sin_theta, cos_theta, 0,
+            0, 0, 1,
+        ])
 
     def __getitem__(self, position: tuple[int, int]) -> int | float:
         # Access individual attributes directly
@@ -98,8 +145,8 @@ class Matrix3x3(Matrix):
         self.a33 = self.a31 * mat.a13 + self.a32 * mat.a23 + self.a33 * mat.a33
         return self
     
-    def __mul__(self, mat: Self) -> Self:
-        return Matrix3x3(
+    def mul_mat3(self, mat: Self) -> Self:
+        return Mat3(
             [
                 self.a11 * mat.a11 + self.a12 * mat.a21 + self.a13 * mat.a31,
                 self.a11 * mat.a12 + self.a12 * mat.a22 + self.a13 * mat.a32,
@@ -115,7 +162,7 @@ class Matrix3x3(Matrix):
             ]
         )
     
-    def mul_vector(self, vec:Vec3) -> Vec3:
+    def mul_vec3(self, vec:Vec3) -> Vec3:
         return Vec3(
             self.a11 * vec.x + self.a12 * vec.y + self.a13 * vec.z,
             self.a21 * vec.x + self.a22 * vec.y + self.a23 * vec.z,
@@ -132,7 +179,7 @@ class Matrix3x3(Matrix):
     
     def get_adjugate(self) -> Self:
         """Calculate the adjugate (adjoint) of the 3x3 matrix."""
-        return Matrix3x3([
+        return Mat3([
             (self.a22 * self.a33 - self.a23 * self.a32), 
             -(self.a12 * self.a33 - self.a13 * self.a32),
             (self.a12 * self.a23 - self.a13 * self.a22), 
@@ -153,39 +200,8 @@ class Matrix3x3(Matrix):
             raise ValueError("The matrix is singular (determinant is 0) and does not have an inverse.")
         coef = 1 / det
         adjugate = self.get_adjugate()
-        return Matrix3x3(
+        return Mat3([
             adjugate.a11 * coef, adjugate.a12 * coef, adjugate.a13 * coef,
             adjugate.a21 * coef, adjugate.a22 * coef, adjugate.a23 * coef,
             adjugate.a31 * coef, adjugate.a32 * coef, adjugate.a33 * coef,
-        )
-    
-    @staticmethod
-    def rotationX(theta: float) -> Self:
-        """Rotate the matrix around the X-axis by angle `theta` (in radians)."""
-        cos_theta = cos(theta)
-        sin_theta = sin(theta)
-        return Matrix3x3([
-            1, 0, 0,
-            0, cos_theta, -sin_theta,
-            0, sin_theta, cos_theta,
-        ])
-    @staticmethod
-    def rotationY(theta: float) -> Self:
-        """Rotate the matrix around the Y-axis by angle `theta` (in radians)."""
-        cos_theta = cos(theta)
-        sin_theta = sin(theta)
-        return Matrix3x3([
-            cos_theta, 0, sin_theta,
-            0, 1, 0,
-            -sin_theta, 0, cos_theta,
-        ])
-    @staticmethod
-    def rotationZ(theta: float) -> Self:
-        """Rotate the matrix around the Z-axis by angle `theta` (in radians)."""
-        cos_theta = cos(theta)
-        sin_theta = sin(theta)
-        return Matrix3x3([
-            cos_theta, -sin_theta, 0,
-            sin_theta, cos_theta, 0,
-            0, 0, 1,
         ])
