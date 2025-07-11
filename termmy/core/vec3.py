@@ -11,20 +11,12 @@ class Vec3:
     y: float
     z: float
 
-    def __add__(self, other: Self | int | float) -> Vec3:
-        if isinstance(other, Vec3):
-            return Vec3(
-                self.x + other.x,
-                self.y + other.y,
-                self.z + other.z,
-            )
-        else:
-            return Vec3(
-                self.x + other,
-                self.y + other,
-                self.z + other,
-            )
-    __radd__ = __add__
+    def __add__(self, other: Self) -> Vec3:
+        return Vec3(
+            self.x + other.x,
+            self.y + other.y,
+            self.z + other.z,
+        )
 
     def __neg__(self) -> Vec3:
         return Vec3(
@@ -33,19 +25,13 @@ class Vec3:
             -self.z,
         )
         
-    def __sub__(self, other: Self | int | float) -> Vec3:
-        if isinstance(other, Vec3):
-            return Vec3(
-                self.x - other.x,
-                self.y - other.y,
-                self.z - other.z,
-            )
-        else:
-            return Vec3(
-                self.x - other,
-                self.y - other,
-                self.z - other,
-            )
+    def __sub__(self, other: Self) -> Vec3:
+        return Vec3(
+            self.x - other.x,
+            self.y - other.y,
+            self.z - other.z,
+        )
+        
     def __rsub__(self, other: int | float) -> Vec3:
         return Vec3(
             other - self.x,
@@ -60,57 +46,32 @@ class Vec3:
             self.z * other,
         )
     __rmul__ = __mul__
-
-    def __truediv__(self, other: int | float) -> Vec3:
-        inverse = 1 / other
-        return Vec3(
-            self.x * inverse,
-            self.y * inverse,
-            self.z * inverse,
-        )
     
-    def __iadd__(self, other: Self | int | float) -> Self:
-        if isinstance(other, Vec3):
-            self.x += other.x
-            self.y += other.y
-            self.z += other.z
-        else:
-            self.x += other
-            self.y += other
-            self.z += other
+    def __iadd__(self, other: Self) -> Self:
+        self.x += other.x
+        self.y += other.y
+        self.z += other.z        
         return self
 
-    def __isub__(self, other: Self | int | float) -> Self:
-        if isinstance(other, Vec3):
-            self.x -= other.x
-            self.y -= other.y
-            self.z -= other.z
-        else:
-            self.x -= other
-            self.y -= other
-            self.z -= other
+    def __isub__(self, other: Self) -> Self:
+        self.x -= other.x
+        self.y -= other.y
+        self.z -= other.z
         return self
 
-    def __imul__(self, other: int | float) -> Self:
-        self.x *= other
-        self.y *= other
-        self.z *= other
-        return self
-    
-    def __idiv__(self, other: int | float) -> Self:
-        inverse = 1 / other
-        self.x *= inverse
-        self.y *= inverse
-        self.z *= inverse
+    def __imul__(self, scalar: int | float) -> Self:
+        self.x *= scalar
+        self.y *= scalar
+        self.z *= scalar
         return self
 
-    def dot(self, other: Self) -> float:
+    def dot_prod(self, other: Self) -> float:
         """
         Dot (Inner) product
         """
         return self.x*other.x + self.y*other.y + self.z*other.z
     
-    def cross(self, other: Self) -> Vec3:
+    def cross_prod(self, other: Self) -> Vec3:
         """
         Cross product
         """
@@ -120,12 +81,18 @@ class Vec3:
             self.x*other.y - self.y*other.x,
         )
     
-    def icross(self, other: Self) -> Self:
+    def icross_prod(self, other: Self) -> Self:
         """
         In-place cross product. Return itself.
         """
-        self.x = self.y*other.z - self.z*other.y
-        self.y = self.z*other.x - self.x*other.z
-        self.z = self.x*other.y - self.y*other.x
+        x = self.x
+        y = self.y
+        z = self.z
+        self.x = y*other.z - z*other.y
+        self.y = z*other.x - x*other.z
+        self.z = x*other.y - y*other.x
         return self
+    
+    def length(self) -> float:
+        return (self.x * self.x + self.y * self.y + self.z * self.z)**0.5
 

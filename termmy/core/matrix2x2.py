@@ -112,10 +112,14 @@ class Mat2(Matrix):
     def __imul__(self, other: Number) -> Self: ...
     def __imul__(self, other: Self | Number) -> Self:
         if isinstance(other, Mat2):
-            self.a11 = self.a11 * other.a11 + self.a12 * other.a21
-            self.a12 = self.a11 * other.a12 + self.a12 * other.a22
-            self.a21 = self.a21 * other.a11 + self.a22 * other.a21
-            self.a22 = self.a21 * other.a12 + self.a22 * other.a22
+            a11 = self.a11
+            a12 = self.a12
+            a21 = self.a21
+            a22 = self.a22
+            self.a11 = a11 * other.a11 + a12 * other.a21
+            self.a12 = a11 * other.a12 + a12 * other.a22
+            self.a21 = a21 * other.a11 + a22 * other.a21
+            self.a22 = a21 * other.a12 + a22 * other.a22
         elif isinstance(other, Number):
             self.a11 *= other
             self.a12 *= other
@@ -174,10 +178,14 @@ class Mat2(Matrix):
                      self.a21 - mat.a21, self.a22 - mat.a22))
 
     def imul_mat2(self, mat: Self) -> Self:
-        self.a11 = self.a11 * mat.a11 + self.a12 * mat.a21
-        self.a12 = self.a11 * mat.a12 + self.a12 * mat.a22
-        self.a21 = self.a21 * mat.a11 + self.a22 * mat.a21
-        self.a22 = self.a21 * mat.a12 + self.a22 * mat.a22
+        a11 = self.a11
+        a12 = self.a12
+        a21 = self.a21
+        a22 = self.a22
+        self.a11 = a11 * mat.a11 + a12 * mat.a21
+        self.a12 = a11 * mat.a12 + a12 * mat.a22
+        self.a21 = a21 * mat.a11 + a22 * mat.a21
+        self.a22 = a21 * mat.a12 + a22 * mat.a22
         return self
     
     def imul_num(self, number: Number) -> Self:

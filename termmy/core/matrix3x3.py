@@ -140,17 +140,24 @@ class Mat3(Matrix):
     @override
     def  __imul__(self, other: Self | Number) -> Self:
         if isinstance(other, Mat3):
-            self.a11 = self.a11 * other.a11 + self.a12 * other.a21 + self.a13 * other.a31
-            self.a12 = self.a11 * other.a12 + self.a12 * other.a22 + self.a13 * other.a32
-            self.a13 = self.a11 * other.a13 + self.a12 * other.a23 + self.a13 * other.a33
-            
-            self.a21 = self.a21 * other.a11 + self.a22 * other.a21 + self.a23 * other.a31
-            self.a22 = self.a21 * other.a12 + self.a22 * other.a22 + self.a23 * other.a32
-            self.a23 = self.a21 * other.a13 + self.a22 * other.a23 + self.a23 * other.a33
-            
-            self.a31 = self.a31 * other.a11 + self.a32 * other.a21 + self.a33 * other.a31
-            self.a32 = self.a31 * other.a12 + self.a32 * other.a22 + self.a33 * other.a32
-            self.a33 = self.a31 * other.a13 + self.a32 * other.a23 + self.a33 * other.a33
+            a11 = self.a11
+            a12 = self.a12
+            a13 = self.a13
+            a21 = self.a21
+            a22 = self.a22
+            a23 = self.a23
+            a31 = self.a31
+            a32 = self.a32
+            a33 = self.a33
+            self.a11 = a11 * other.a11 + a12 * other.a21 + a13 * other.a31
+            self.a12 = a11 * other.a12 + a12 * other.a22 + a13 * other.a32
+            self.a13 = a11 * other.a13 + a12 * other.a23 + a13 * other.a33
+            self.a21 = a21 * other.a11 + a22 * other.a21 + a23 * other.a31
+            self.a22 = a21 * other.a12 + a22 * other.a22 + a23 * other.a32
+            self.a23 = a21 * other.a13 + a22 * other.a23 + a23 * other.a33
+            self.a31 = a31 * other.a11 + a32 * other.a21 + a33 * other.a31
+            self.a32 = a31 * other.a12 + a32 * other.a22 + a33 * other.a32
+            self.a33 = a31 * other.a13 + a32 * other.a23 + a33 * other.a33
         elif isinstance(other, Number):
             self.a11 *= other
             self.a12 *= other
@@ -285,17 +292,24 @@ class Mat3(Matrix):
         ))
     
     def imul_mat3(self, mat: Self) -> Self:
-        self.a11 = self.a11 * mat.a11 + self.a12 * mat.a21 + self.a13 * mat.a31
-        self.a12 = self.a11 * mat.a12 + self.a12 * mat.a22 + self.a13 * mat.a32
-        self.a13 = self.a11 * mat.a13 + self.a12 * mat.a23 + self.a13 * mat.a33
-        
-        self.a21 = self.a21 * mat.a11 + self.a22 * mat.a21 + self.a23 * mat.a31
-        self.a22 = self.a21 * mat.a12 + self.a22 * mat.a22 + self.a23 * mat.a32
-        self.a23 = self.a21 * mat.a13 + self.a22 * mat.a23 + self.a23 * mat.a33
-        
-        self.a31 = self.a31 * mat.a11 + self.a32 * mat.a21 + self.a33 * mat.a31
-        self.a32 = self.a31 * mat.a12 + self.a32 * mat.a22 + self.a33 * mat.a32
-        self.a33 = self.a31 * mat.a13 + self.a32 * mat.a23 + self.a33 * mat.a33
+        a11 = self.a11
+        a12 = self.a12
+        a13 = self.a13
+        a21 = self.a21
+        a22 = self.a22
+        a23 = self.a23
+        a31 = self.a31
+        a32 = self.a32
+        a33 = self.a33
+        self.a11 = a11 * mat.a11 + a12 * mat.a21 + a13 * mat.a31
+        self.a12 = a11 * mat.a12 + a12 * mat.a22 + a13 * mat.a32
+        self.a13 = a11 * mat.a13 + a12 * mat.a23 + a13 * mat.a33
+        self.a21 = a21 * mat.a11 + a22 * mat.a21 + a23 * mat.a31
+        self.a22 = a21 * mat.a12 + a22 * mat.a22 + a23 * mat.a32
+        self.a23 = a21 * mat.a13 + a22 * mat.a23 + a23 * mat.a33
+        self.a31 = a31 * mat.a11 + a32 * mat.a21 + a33 * mat.a31
+        self.a32 = a31 * mat.a12 + a32 * mat.a22 + a33 * mat.a32
+        self.a33 = a31 * mat.a13 + a32 * mat.a23 + a33 * mat.a33
         return self
     
     def imul_num(self, number: Number) -> Self:
