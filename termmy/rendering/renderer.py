@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from ..core import NormFloat
+from ..core import Transform2D
 from ..colors import Color
 from ..buffers import ColorBuffer, MultisampleColorBuffer
 from ..graphics import Scene, Node
 
 from .anti_aliasing import MSAA, AAA, SSAA
 from .anti_aliasing import MSAAoff, AAAoff, SSAAoff
-from .rasterizer import Rasterizer
+from .rasterizers import Rasterizer
 from .render_context import RenderContext
 
 from dataclasses import dataclass
@@ -22,7 +22,7 @@ class Renderer:
             type, 
             Callable[
                 [Renderer, Node, RenderContext,
-                NormFloat, NormFloat, Scene],
+                 Transform2D, Scene],
                 None,
             ]
             | Rasterizer,
@@ -47,6 +47,7 @@ class Renderer:
         Returns:
             ColorBuffer: A reference to the `render_context.color_buffer`.
         """
+        raise NotImplementedError
         
     
     def initiate_buffer(self, scene: Scene, render_context: RenderContext) -> Renderer:
@@ -80,29 +81,23 @@ class Renderer:
                 )
             
     def render_nodes(self, scene: Scene, render_context: RenderContext) -> Renderer:
-        out = render_context.color_buffer.data
-        width = render_context.width
-        height = render_context.height
         for node in scene._nodes:
-            self._render_node(node, width, height, 0.0, 0.0, out)
+            self._render_node(node, render_context, scene=scene)
         if self.msaa:
             render_context.ms_buffer.resolve_to(render_context.color_buffer)
         return self
     
     def _render_node(self, 
                      node: Node, 
-                     width: int, 
-                     height: int, 
-                     x_offset: NormFloat,
-                     y_offset: NormFloat,
-                     out: tuple[Color]) -> None:
+                     render_context: RenderContext,
+                     scene: Scene) -> None:
         rasterizer = Renderer.rasterizers.get(type(node), None)
         if rasterizer:
-            rasterizer(self, node, width, height, x_offset, y_offset, out)
+            rasterizer(self, node, render_context, scene=scene)
         else:
             raise ValueError(f"No rasterizer found for {type(node)}")
         for child in node._children:
-            self._render_node(child, width, height, x_offset, y_offset, out)
+            self._render_node(child, render_context, scene=scene)
 
 
 ################################################################
