@@ -1,17 +1,26 @@
-from dataclasses import dataclass
+
+
+from dataclasses import dataclass, field
 from typing import override
 
 from .shape import Shape
-from ...colors import Color
-from ..fills import SolidFill
+from ..fills import Fill
+from ..stroke import Stroke
 from ...core import Vec2Rela, NormFloat
+from ...colors import Color
 
 @dataclass(slots=True)
-class Line(Shape):
+class SimpleLine(Shape):
     start: Vec2Rela = None
     end: Vec2Rela = None
-    weight: NormFloat = 0.02
-    stroke: None = None
+    fill: Fill | None = None
+
+    width: float = field(init=False)
+    height: float = field(init=False)
+
+    def __post_init__(self):
+        self.width = abs(self.end.x - self.start.x)
+        self.height = abs(self.end.y - self.start.y)
 
     def slope(self) -> float:
         return ((self.end.y - self.start.y) / (self.end.x - self.start.x) 
@@ -27,6 +36,12 @@ class Line(Shape):
         if self.end.y == self.start.y:
             raise ValueError("Horizontal line has no x-intercept.")
         return (self.start.x - (self.start.y / self.slope()))
+
+
+@dataclass(slots=True)
+class Line(SimpleLine):
+    stroke: Stroke | None = None
+    weight: NormFloat = 0.02
 
     @override
     def _render(
