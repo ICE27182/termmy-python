@@ -120,7 +120,7 @@ def _initiate_unmatched_color_buffer(base: ColorBuffer,
     for y in range(out_height):
         for x in range(out_width):
             i = row_starting_index + x
-            color = base_data[int(y_scale*y*base_width + x_scale*x)]
+            color = base_data[int(y_scale*y)*base_width + int(x_scale*x)]
             old_color = out.data[i]
             old_color.r = color.r
             old_color.g = color.g
@@ -163,7 +163,7 @@ def _initiate_unmatched_ms_buffer(base: ColorBuffer,
     sample_num = len(msaa)
     for y in range(out_height):
         for x in range(out_width):
-            color = base_data[int(y_scale*y*base_width + x_scale*x)]
+            color = base_data[int(y_scale*y)*base_width + int(x_scale*x)]
             start = (row_starting_index + x) * sample_num
             for j in range(sample_num):
                 old_color = out.data[start + j]

@@ -84,7 +84,7 @@ def apply_fxaa_to(buffer: ColorBuffer,
     data = buffer.data
     scratch_data = scratch_buffer.data
     luminance_map = [0.299 * c.r + 0.587 * c.g + 0.114 * c.b for c in data]
-    for row_starting in range(width, (width - 1) * height, width):
+    for row_starting in range(width, width * (height - 1), width):
         last_row_starting = row_starting - width
         next_row_starting = row_starting + width
         for x in range(1, width - 1):

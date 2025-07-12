@@ -20,7 +20,6 @@ class PostEffect:
     grayscale: bool = False
 
     color_filter: Callable[[Color], Color] | None = None
-    spatial_effect: Callable[[int, int, RenderContext], Color] | None = None
 
     def apply(self, render_context: RenderContext) -> ColorBuffer:
         """
@@ -49,16 +48,14 @@ class PostEffect:
                                 "does not match the target dimension "
                                 f"{width}x{height}.")
             scratch_buffer = render_context.scratch_buffer
-            _with_fxaa(render_context.color_buffer, self.dithering, 
+            _with_fxaa(render_context, self.dithering, 
                        self.invert, self.gamma, self.exposure, 
                        self.grayscale, self.color_filter, 
-                       self.spatial_effect, self.fxaa_threshold, 
-                       scratch_buffer)
+                       self.fxaa_threshold)
         else:
-            _without_fxaa(render_context.color_buffer, self.dithering, 
+            _without_fxaa(render_context, self.dithering, 
                           self.invert, self.gamma, self.exposure, 
-                          self.grayscale, self.color_filter, 
-                          self.spatial_effect)
+                          self.grayscale, self.color_filter)
 
 
 def _without_fxaa(
@@ -69,17 +66,13 @@ def _without_fxaa(
     exposure: float,
     grayscale: bool,
     color_filter: Callable[[Color], Color] | None,
-    spatial_effect: Callable[[int, int, RenderContext], Color] | None,
 ) -> ColorBuffer:
     buffer = render_context.color_buffer
     width, height = render_context.width, render_context.height
     data = buffer.data
     for y, row_starting in zip(range(height), range(0, height*width, width)):
         for x in range(width):
-            if spatial_effect:
-                color = spatial_effect(x, y, render_context)
-            else:
-                color = data[row_starting + x]
+            color = data[row_starting + x]
             if color_filter:
                 new_color = color_filter(color)
                 color.r = new_color.r
@@ -116,7 +109,6 @@ def _with_fxaa(
     exposure: float,
     grayscale: bool,
     color_filter: Callable[[Color], Color] | None,
-    spatial_effect: Callable[[int, int, RenderContext], Color] | None,
     threshold: float,
 ) -> ColorBuffer:
     buffer = render_context.color_buffer
@@ -127,7 +119,7 @@ def _with_fxaa(
     luminance_map = [0.299 * c.r + 0.587 * c.g + 0.114 * c.b for c in data]
     
     for y, row_starting in zip(range(height), 
-                               range(width, (width - 1) * height, width)):
+                               range(width, width * (height - 1), width)):
         last_row_starting = row_starting - width
         next_row_starting = row_starting + width
         for x in range(1, width - 1):
@@ -158,10 +150,6 @@ def _with_fxaa(
             color.g = sum(color.g for color in to_be_blended) * coef
             color.b = sum(color.b for color in to_be_blended) * coef
             # Other passes
-            if spatial_effect:
-                color = spatial_effect(x, y, render_context)
-            else:
-                color = data[row_starting + x]
             if color_filter:
                 new_color = color_filter(color)
                 color.r = new_color.r
@@ -187,28 +175,23 @@ def _with_fxaa(
                 color.r = new_color.r
                 color.g = new_color.g
                 color.b = new_color.b
-    # Apply to the first and last rows
+    # The first and last rows
     last_y = height - 1
+    last_row_starting = width * (height - 1)
     for x in range(width):
         # Top
-        target_color_top = scratch_data[x]
+        color_t = scratch_data[x]
         original_color_top = data[x]
-        target_color_top.r = original_color_top.r
-        target_color_top.g = original_color_top.g
-        target_color_top.b = original_color_top.b
+        color_t.r = original_color_top.r
+        color_t.g = original_color_top.g
+        color_t.b = original_color_top.b
         # Bottom
-        target_color_bottom = scratch_data[x + last_row_starting]
+        color_b = scratch_data[x + last_row_starting]
         original_color_bottom = data[x + last_row_starting]
-        target_color_bottom.r = original_color_bottom.r
-        target_color_bottom.g = original_color_bottom.g
-        target_color_bottom.b = original_color_bottom.b
+        color_b.r = original_color_bottom.r
+        color_b.g = original_color_bottom.g
+        color_b.b = original_color_bottom.b
         # Other passes
-        if spatial_effect:
-            color_t = spatial_effect(x, 0, render_context)
-            color_b = spatial_effect(x, last_y, render_context)
-        else:
-            color_t = data[x]
-            color_b = data[last_row_starting + x]
         if color_filter:
             new_color_t = color_filter(color_t)
             color_t.r = new_color_t.r
@@ -253,29 +236,23 @@ def _with_fxaa(
             color_b.r = new_color_b.r
             color_b.g = new_color_b.g
             color_b.b = new_color_b.b
-    # Apply to the first and last columns
+    # The first and last columns
     last_x = width - 1
     for y, row_starting in zip(range(height), 
                                range(0, width * height, width)):
         # Left
-        target_color_left = scratch_data[row_starting]
+        color_l = scratch_data[row_starting]
         original_color_left = data[row_starting]
-        target_color_left.r = original_color_left.r
-        target_color_left.g = original_color_left.g
-        target_color_left.b = original_color_left.b
+        color_l.r = original_color_left.r
+        color_l.g = original_color_left.g
+        color_l.b = original_color_left.b
         # Right
-        target_color_right = scratch_data[row_starting + last_x]
+        color_r = scratch_data[row_starting + last_x]
         original_color_right = data[row_starting + last_x]
-        target_color_right.r = original_color_right.r
-        target_color_right.g = original_color_right.g
-        target_color_right.b = original_color_right.b
+        color_r.r = original_color_right.r
+        color_r.g = original_color_right.g
+        color_r.b = original_color_right.b
         # Other passes
-        if spatial_effect:
-            color_l = spatial_effect(0, y, render_context)
-            color_r = spatial_effect(last_x, y, render_context)
-        else:
-            color_l = data[x]
-            color_r = data[last_row_starting + x]
         if color_filter:
             new_color_l = color_filter(color_l)
             color_l.r = new_color_l.r
