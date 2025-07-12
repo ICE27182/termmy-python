@@ -6,15 +6,11 @@ from dataclasses import dataclass
 from abc import ABC
 
 from ..node import Node
-from ..fills.fill import Fill
-from ..stroke.stroke import Stroke
 from ...colors import Color
 from ...core import NormFloat
 
 @dataclass(slots=True, kw_only=True)
 class Shape(Node, ABC):
-    fill: Fill | None
-    stroke: Stroke | None
     width: NormFloat
     height: NormFloat
     

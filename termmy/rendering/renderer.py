@@ -9,13 +9,13 @@ from ..graphics import Scene, Node
 
 from .anti_aliasing import MSAA, AAA, SSAA
 from .anti_aliasing import MSAAoff, AAAoff, SSAAoff
-from .rasterizers import Rasterizer
+from .rasterizers import Rasterizer, RASTERIZERS
 from .render_context import RenderContext
 
 from dataclasses import dataclass
 from typing import ClassVar, Callable
 
-@dataclass
+@dataclass(slots=True)
 class Renderer:
     rasterizers: ClassVar[
         dict[
@@ -27,7 +27,7 @@ class Renderer:
             ]
             | Rasterizer,
         ] 
-    ]
+    ] = RASTERIZERS
     msaa: MSAA = MSAAoff
     aaa: AAA = AAAoff
     ssaa: SSAA = SSAAoff
@@ -50,42 +50,41 @@ class Renderer:
         raise NotImplementedError
         
     
-    def initiate_buffer(self, scene: Scene, render_context: RenderContext) -> Renderer:
+    def initiate_buffer(self, scene: Scene, render_context: RenderContext) -> None:
         width = render_context.width
         height = render_context.height
         buffer = render_context.color_buffer
         base = scene.base
         if self.msaa:
             if base.width == width and base.height == height:
-                return _initiate_matched_ms_buffer(
+                _initiate_matched_ms_buffer(
                     base.data,
                     self.msaa,
                     buffer,
                 )
             else:
-                return _initiate_unmatched_ms_buffer(
+                _initiate_unmatched_ms_buffer(
                     base,
                     self.msaa,
                     buffer,
                 )
         else:
             if base.width == width and base.height == height:
-                return _initiate_matched_color_buffer(
+                _initiate_matched_color_buffer(
                     base.data,
                     buffer,
                 )
             else:
-                return _initiate_unmatched_color_buffer(
+                _initiate_unmatched_color_buffer(
                     base,
                     buffer,
                 )
             
-    def render_nodes(self, scene: Scene, render_context: RenderContext) -> Renderer:
+    def render_nodes(self, scene: Scene, render_context: RenderContext) -> None:
         for node in scene._nodes:
             self._render_node(node, render_context, scene=scene)
         if self.msaa:
             render_context.ms_buffer.resolve_to(render_context.color_buffer)
-        return self
     
     def _render_node(self, 
                      node: Node, 
@@ -111,7 +110,6 @@ def _initiate_matched_color_buffer(base_data: tuple[Color],
         out_color.g = base_color.g
         out_color.b = base_color.b
         out_color.a = base_color.a
-    return out
 
 def _initiate_unmatched_color_buffer(base: ColorBuffer,
                                      out: ColorBuffer) -> ColorBuffer:
@@ -129,7 +127,6 @@ def _initiate_unmatched_color_buffer(base: ColorBuffer,
             old_color.b = color.b
             old_color.a = color.a
         row_starting_index += out_width
-    return out
 
 def _initiate_matched_ms_buffer(base_data: tuple[Color],
                                 msaa: MSAA,
@@ -149,7 +146,6 @@ def _initiate_matched_ms_buffer(base_data: tuple[Color],
             out_color.g = base_color.g
             out_color.b = base_color.b
             out_color.a = base_color.a
-    return out
 
 def _initiate_unmatched_ms_buffer(base: ColorBuffer,
                                   msaa: MSAA,
@@ -176,5 +172,4 @@ def _initiate_unmatched_ms_buffer(base: ColorBuffer,
                 old_color.b = color.b
                 old_color.a = color.a
         row_starting_index += out_width
-    return out
 ################################################################
