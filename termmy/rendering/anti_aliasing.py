@@ -2,46 +2,98 @@
 
 from __future__ import annotations
 
-from typing import overload
 from ..colors import Color
 from ..buffers import ColorBuffer
 
-type SSAA = int
-SSAAoff = 0
-SSAAx2 = 2
-SSAAx4 = 4
+from typing import overload
+from dataclasses import dataclass, field
+from abc import ABC
+from math import log2
 
-type SamplePattern = tuple[tuple[float, float], ...]
-type MSAA = SamplePattern
-type AAA = SamplePattern
 
-MSAAoff = tuple()
-MSAAx2 = ((-0.25, -0.25), (0.25, 0.25))
-MSAAx4 = ((-0.375, -0.125), (0.125, -0.375), 
-          (0.375, 0.125), (-0.125, 0.375))
-MSAAx8 = ((-0.4375, -0.3125), (-0.3125, -0.4375), 
-          (-0.0625, -0.4375), (0.1875, -0.4375),
-          (0.4375, -0.3125), (0.4375, -0.0625), 
-          (0.4375, 0.1875), (0.3125, 0.4375))
-MSAAx16 = ((-0.5625, -0.4375), (-0.4375, -0.5625), 
-           (-0.3125, -0.3125), (-0.1875, -0.6875),
-           (-0.0625, -0.4375), ( 0.0625, -0.8125), 
-           ( 0.1875, -0.1875), ( 0.3125, -0.6875),
-           ( 0.4375, -0.3125), ( 0.5625, -0.0625), 
-           ( 0.6875, -0.5625), ( 0.8125, -0.3125),
-           (-0.8125,  0.1875), (-0.6875,  0.4375), 
-           (-0.4375,  0.8125), (-0.3125,  0.6875))
+@dataclass(slots=True, frozen=True)
+class AntiAliasing(ABC): pass
 
-AAAoff = MSAAoff
-AAAx2 = MSAAx2
-AAAx4 = MSAAx4
-AAAx8 = MSAAx8
-AAAx16 = MSAAx16
+@dataclass(slots=True, frozen=True)
+class SSAA(AntiAliasing):
+    level: int
+    def __bool__(self): return self.level > 1
+
+@dataclass(slots=True, frozen=True)
+class MSAA(AntiAliasing):
+    pattern: tuple[tuple[float, float]]
+    _level: int | None
+
+    @classmethod
+    def from_pattern(cls, pattern: tuple[tuple[float, float]]) -> MSAA:
+        length = len(pattern)
+        level = int(log2(length)) if length else None
+        if 2 ** level != length:
+            raise ValueError("The number of samples in the pattern "
+                             "must be a power of two. "
+                             f"Got {length} samples.")
+        return cls(pattern, level)
+        
+    def __bool__(self): return not not self.pattern
+
+@dataclass(slots=True, frozen=True)
+class AAA(AntiAliasing):
+    pattern: tuple[tuple[float, float]]
+    _level: int | None = field(init=False)
+
+    @classmethod
+    def from_pattern(cls, pattern: tuple[tuple[float, float]]) -> AAA:
+        length = len(pattern)
+        level = int(log2(length)) if length else None
+        if 2 ** level != length:
+            raise ValueError("The number of samples in the pattern "
+                             "must be a power of two. "
+                             f"Got {length} samples.")
+        return cls(pattern, level)
+    
+    def __bool__(self): return not not self.pattern
+
+@dataclass(slots=True)
+class FXAA(AntiAliasing):
+    threshold: float = 0.15
+    @overload
+    def apply_fxaa_to(self, buffer: ColorBuffer,
+                      scratch_buffer: ColorBuffer 
+                                      | None = None) -> ColorBuffer:
+        """Apply FXAA to the provided color buffer. The alpha channel
+        should be discarded after this function.
+
+        It is more efficient to pass in a scratch buffer.
+        
+        Returns:
+            ColorBuffer: The buffer itself with FXAA applied.
+        
+        Raises:
+            ValueError: If `scratch_buffer` is provided but its demension does 
+                not match the buffer's dimension.
+        """
+    @overload
+    def apply_fxaa_to(self, buffer: ColorBuffer, 
+                      scratch_buffer: ColorBuffer) -> ColorBuffer:
+        """Apply FXAA to the provided color buffer. The alpha channel
+        should be discarded after this function.
+        
+        Returns:
+            ColorBuffer: The buffer itself with FXAA applied.
+
+        Raises:
+            ValueError: If `scratch_buffer` is provided but its demension does 
+                not match the buffer's dimension.
+        """
+    def apply_fxaa_to(self, buffer: ColorBuffer, 
+                      scratch_buffer: ColorBuffer 
+                                      | None = None) -> ColorBuffer:
+        return apply_fxaa_to(buffer, scratch_buffer, self.threshold)
 
 @overload
 def apply_fxaa_to(buffer: ColorBuffer,
-                  scratch_buffer: ColorBuffer | None = None,
-                  threshold: float = 0.15) -> ColorBuffer:
+                scratch_buffer: ColorBuffer | None = None,
+                threshold: float = 0.15) -> ColorBuffer:
     """Apply FXAA to the provided color buffer. The alpha channel
     should be discarded after this function.
 
@@ -57,7 +109,7 @@ def apply_fxaa_to(buffer: ColorBuffer,
 
 @overload
 def apply_fxaa_to(buffer: ColorBuffer, scratch_buffer: ColorBuffer, 
-                  threshold: float = 0.15) -> ColorBuffer:
+                threshold: float = 0.15) -> ColorBuffer:
     """Apply FXAA to the provided color buffer. The alpha channel
     should be discarded after this function.
     
@@ -70,16 +122,16 @@ def apply_fxaa_to(buffer: ColorBuffer, scratch_buffer: ColorBuffer,
     """
 
 def apply_fxaa_to(buffer: ColorBuffer, 
-                  scratch_buffer: ColorBuffer | None = None,
-                  threshold: float = 0.15) -> ColorBuffer:
+                scratch_buffer: ColorBuffer | None = None,
+                threshold: float = 0.15) -> ColorBuffer:
     width, height = buffer.width, buffer.height
     if scratch_buffer is None:
         scratch_buffer = ColorBuffer(width, height) 
     elif scratch_buffer.width != width or scratch_buffer.height != height:
         raise ValueError("`scratch_buffer` is provided but its demension "
-                         f"{scratch_buffer.width}x{scratch_buffer.height} "
-                         "does not match the buffer's dimension "
-                         f"{width}x{height}.")
+                        f"{scratch_buffer.width}x{scratch_buffer.height} "
+                        "does not match the buffer's dimension "
+                        f"{width}x{height}.")
     # Write the FXAA processed buffer to scratch_buffer
     data = buffer.data
     scratch_data = scratch_buffer.data
@@ -146,4 +198,38 @@ def apply_fxaa_to(buffer: ColorBuffer,
     scratch_buffer.data, buffer.data = buffer.data, scratch_buffer.data
     return buffer
 
+SSAAoff = SSAA(0)
+SSAAx2 = SSAA(2)
+SSAAx4 = SSAA(4)
 
+_SAMPLES_0 = tuple()
+_SAMPLES_2 = ((-0.25, -0.25), (0.25, 0.25))
+_SAMPLES_4 = ((-0.375, -0.125), ( 0.125, -0.375), 
+              ( 0.375,  0.125), (-0.125,  0.375))
+_SAMPLES_8 = ((-0.4375, -0.3125), (-0.3125, -0.4375), 
+              (-0.0625, -0.4375), ( 0.1875, -0.4375),
+              ( 0.4375, -0.3125), ( 0.4375, -0.0625), 
+              ( 0.4375,  0.1875), ( 0.3125,  0.4375))
+_SAMPLES_16 = ((-0.5625, -0.4375), (-0.4375, -0.5625), 
+               (-0.3125, -0.3125), (-0.1875, -0.6875),
+               (-0.0625, -0.4375), ( 0.0625, -0.8125), 
+               ( 0.1875, -0.1875), ( 0.3125, -0.6875),
+               ( 0.4375, -0.3125), ( 0.5625, -0.0625), 
+               ( 0.6875, -0.5625), ( 0.8125, -0.3125),
+               (-0.8125,  0.1875), (-0.6875,  0.4375), 
+               (-0.4375,  0.8125), (-0.3125,  0.6875))
+
+MSAAoff = MSAA(_SAMPLES_0)
+MSAAx2 = MSAA(_SAMPLES_2)
+MSAAx4 = MSAA(_SAMPLES_4)
+MSAAx8 = MSAA(_SAMPLES_8)
+MSAAx16 = MSAA(_SAMPLES_16)
+
+AAAoff = AAA(_SAMPLES_0)
+AAAx2 = AAA(_SAMPLES_2)
+AAAx4 = AAA(_SAMPLES_4)
+AAAx8 = AAA(_SAMPLES_8)
+AAAx16 = AAA(_SAMPLES_16)
+
+FXAAon = FXAA()
+FXAAoff = False
