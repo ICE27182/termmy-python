@@ -53,17 +53,17 @@ class Renderer:
         height = render_context.height
         buffer = render_context.color_buffer
         base = scene.base
-        if self.msaa:
+        if isinstance(self.anti_aliasing, MSAA):
             if base.width == width and base.height == height:
                 _initiate_matched_ms_buffer(
                     base.data,
-                    self.msaa,
+                    self.anti_aliasing,
                     buffer,
                 )
             else:
                 _initiate_unmatched_ms_buffer(
                     base,
-                    self.msaa,
+                    self.anti_aliasing,
                     buffer,
                 )
         else:
@@ -81,7 +81,7 @@ class Renderer:
     def render_nodes(self, scene: Scene, render_context: RenderContext) -> None:
         for node in scene._nodes:
             self._render_node(node, render_context, scene=scene)
-        if self.msaa:
+        if isinstance(self.anti_aliasing, MSAA):
             render_context.ms_buffer.resolve_to(render_context.color_buffer)
     
     def _render_node(self, 
