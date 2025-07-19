@@ -8,7 +8,6 @@ from ..buffers import ColorBuffer, MultisampleColorBuffer
 from ..graphics import Scene, Node
 
 from .anti_aliasing import MSAA, AAA, SSAA
-from .anti_aliasing import MSAAoff, AAAoff, SSAAoff
 from .rasterizers import Rasterizer, RASTERIZERS
 from .render_context import RenderContext
 
@@ -28,9 +27,8 @@ class Renderer:
             | Rasterizer,
         ] 
     ] = RASTERIZERS
-    msaa: MSAA = MSAAoff
-    aaa: AAA = AAAoff
-    ssaa: SSAA = SSAAoff
+
+    anti_aliasing: MSAA | AAA | SSAA | None = None
 
     def render(self, scene: Scene, render_context: RenderContext) -> ColorBuffer:
         """Render the scene to a new color buffer with the same dimensions

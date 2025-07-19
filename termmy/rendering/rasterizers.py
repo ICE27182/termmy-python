@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .render_context import RenderContext
+from .anti_aliasing import MSAA, AAA, SSAA
 from ..core import NormFloat, Vec2Rela
 from ..colors import Color
 from ..graphics import Scene, Node, Dot, SimpleLine, Line
@@ -42,17 +43,20 @@ def rasterize_dot(renderer: Renderer,
         width = render_context.width
         height = render_context.height
         transform = dot.transform
-        sample_num = len(renderer.msaa)
-        data = (render_context.ms_buffer.data if sample_num
+        aa = renderer.anti_aliasing
+        uses_msaa = isinstance(aa, MSAA)
+        sample_level = aa._level if uses_msaa else None
+        data = (render_context.ms_buffer.data if sample_level
                 else render_context.color_buffer.data)
-        fill_color = dot.fill.color
+        
         vec = transform.apply(_VEC2_0_0)
         x = round(vec.x * width)
         y = round(vec.y * height)
+        fill_color = dot.fill.color
         if 0 <= x < width and 0 <= y < height:
-            if sample_num:
-                start = (y * width + x) * sample_num
-                for i in range(start, start + sample_num):
+            if uses_msaa and sample_level:
+                start = (y * width + x) << sample_level
+                for i in range(start, start + sample_level):
                     old_color = data[i]
                     old_color.r = fill_color.r
                     old_color.g = fill_color.g
@@ -98,6 +102,13 @@ def rasterize_simple_line(renderer: Renderer,
         sample_num = len(renderer.msaa)
         data = (render_context.ms_buffer.data if sample_num
                 else render_context.color_buffer.data)
+        aa = renderer.anti_aliasing
+        if isinstance(aa, MSAA):
+            pass
+        elif isinstance(aa, AAA):
+            pass
+        elif isinstance(aa, SSAA):
+            pass
         
         for _ in range(round(width * height_inv * ((line.width * width)**2 + (line.height * height)**2)**0.5)):
             dis_x = round(x * width)

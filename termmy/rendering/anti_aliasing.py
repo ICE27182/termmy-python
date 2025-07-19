@@ -6,7 +6,7 @@ from ..colors import Color
 from ..buffers import ColorBuffer
 
 from typing import overload
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from abc import ABC
 from math import log2
 
@@ -39,7 +39,7 @@ class MSAA(AntiAliasing):
 @dataclass(slots=True, frozen=True)
 class AAA(AntiAliasing):
     pattern: tuple[tuple[float, float]]
-    _level: int | None = field(init=False)
+    _level: int | None
 
     @classmethod
     def from_pattern(cls, pattern: tuple[tuple[float, float]]) -> AAA:
@@ -53,7 +53,7 @@ class AAA(AntiAliasing):
     
     def __bool__(self): return not not self.pattern
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class FXAA(AntiAliasing):
     threshold: float = 0.15
     @overload
@@ -219,17 +219,17 @@ _SAMPLES_16 = ((-0.5625, -0.4375), (-0.4375, -0.5625),
                (-0.8125,  0.1875), (-0.6875,  0.4375), 
                (-0.4375,  0.8125), (-0.3125,  0.6875))
 
-MSAAoff = MSAA(_SAMPLES_0)
-MSAAx2 = MSAA(_SAMPLES_2)
-MSAAx4 = MSAA(_SAMPLES_4)
-MSAAx8 = MSAA(_SAMPLES_8)
-MSAAx16 = MSAA(_SAMPLES_16)
+MSAAoff = MSAA(_SAMPLES_0, None)
+MSAAx2 = MSAA(_SAMPLES_2, 1)
+MSAAx4 = MSAA(_SAMPLES_4, 2)
+MSAAx8 = MSAA(_SAMPLES_8, 3)
+MSAAx16 = MSAA(_SAMPLES_16, 4)
 
-AAAoff = AAA(_SAMPLES_0)
-AAAx2 = AAA(_SAMPLES_2)
-AAAx4 = AAA(_SAMPLES_4)
-AAAx8 = AAA(_SAMPLES_8)
-AAAx16 = AAA(_SAMPLES_16)
+AAAoff = AAA(_SAMPLES_0, None)
+AAAx2 = AAA(_SAMPLES_2, 1)
+AAAx4 = AAA(_SAMPLES_4, 2)
+AAAx8 = AAA(_SAMPLES_8, 3)
+AAAx16 = AAA(_SAMPLES_16, 4)
 
 FXAAon = FXAA()
 FXAAoff = False
