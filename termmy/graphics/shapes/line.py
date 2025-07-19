@@ -6,13 +6,13 @@ from typing import override
 from .shape import Shape
 from ..fills import Fill
 from ..stroke import Stroke
-from ...core import Vec2Rela, NormFloat
+from ...core import Vec2, AbsoFloat
 from ...colors import Color
 
 @dataclass(slots=True)
 class SimpleLine(Shape):
-    start: Vec2Rela = None
-    end: Vec2Rela = None
+    start: Vec2 = None
+    end: Vec2 = None
     fill: Fill | None = None
 
     width: float = field(init=False)
@@ -41,43 +41,4 @@ class SimpleLine(Shape):
 @dataclass(slots=True)
 class Line(SimpleLine):
     stroke: Stroke | None = None
-    weight: NormFloat = 0.02
-
-    @override
-    def _render(
-        self, 
-        width: int, 
-        height: int, 
-        x_offset: NormFloat,
-        y_offset: NormFloat,
-        out: dict[int, Color],
-    ) -> dict[int, Color]:
-        dir_x = self.end.x - self.start.x
-        dir_y = self.end.y - self.start.y
-        len_inv = (dir_x*dir_x + dir_y*dir_y) ** -0.5
-        weight: int = round((width*width + height*height) ** 0.5 * self.weight)
-        dir_x *= len_inv
-        dir_y *= len_inv
-        x = width * (self.start.x + x_offset)
-        y = height * (self.start.y + y_offset)
-        end_x = width * (self.end.x + x_offset)
-        end_y = height * (self.end.y + y_offset)
-        while dir_x * (end_x - x) + dir_y * (end_y - y) > 0.0:
-            for i in range(1-weight, weight):
-                # (-dir_y, dir_x) is perpendicular to (dir_x, dir_y)
-                dis_x = round(x + i * -dir_y)
-                dis_y = round(y + i * dir_x)
-                if 0 <= dis_x < width and 0 <= dis_y < height:
-                    out[dis_y * width + dis_x] = self.fill.get_color(
-                        dis_x / width - x_offset, 
-                        dis_y / height - y_offset,
-                    )
-            x += dir_x
-            y += dir_y
-        
-        return super(Line, self)._render(width, height, out=out,
-                                         x_offset=x_offset + self.x, 
-                                         y_offset=y_offset + self.y)
-        
-        
-        
+    weight: AbsoFloat = 0.02
