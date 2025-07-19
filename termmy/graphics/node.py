@@ -5,13 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from collections.abc import Iterator
 
-from ..colors import Color
-from ..core import NormFloat, Transform2D
+from ..core import Transform2D
 
 @dataclass(slots=True, kw_only=True)
 class Node:
-    x: NormFloat = 0.0
-    y: NormFloat = 0.0
     z: float = 0.0
     transform: Transform2D = field(default_factory=Transform2D)
     # Hidden to encourage the user to use `add_child` instead of directly 
@@ -46,6 +43,10 @@ class Node:
         else:
             self._children.append(child)
             self._children.sort(key=lambda node: node.z)
+            child._parent = self
+            # No self parenting with transform because 
+            # `child.transform._parent` must be None 
+            # or it would have raised a ValueError
             child.transform._parent = self.transform
         return self
     
