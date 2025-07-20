@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-from .vec2 import Vec2Rela
+from .vec2 import Vec2
 from .matrix2x2 import Mat2
 
 from dataclasses import dataclass, field
 
 @dataclass(slots=True)
 class Transform2D:
-    # TODO Add getters and setters
-    translate: Vec2Rela = field(default_factory=lambda: Vec2Rela(0.0, 0.0))
+    translate: Vec2 = field(default_factory=lambda: Vec2(0.0, 0.0))
+    pivot: Vec2 = field(default_factory=lambda: Vec2(0.0, 0.0))
     _scale: float = 1.0
     _rotation_radians: float = 0.0
-    pivot: Vec2Rela = field(default_factory=lambda: Vec2Rela(0.0, 0.0))
     _mat: Mat2 = field(default_factory=Mat2.get_identity_matrix)
     _parent: Transform2D | None = None
 
@@ -31,17 +30,40 @@ class Transform2D:
             current = current._parent
         return False
 
-    def apply(self, vec: Vec2Rela) -> Vec2Rela:
+    def apply(self, vec: Vec2) -> Vec2:
+        """Apply this transform and all its parent transforms to the provided
+        vector. The `vec` passed in will not be mutated.
+        
+        Returns:
+            Vec2: A new Vec2 object.
+        """
         current = self
         while current is not None:
-            # NOTE I'm not sure about this.
-            # The scalar is applied to `vec - current._pivot` 
-            # but not to `current._pivot + current._translate`
             vec = (
                 current._mat * (vec - current.pivot)
                 + current.pivot + current.translate
             )
             current = current._parent
+        return vec
+    
+    def unapply(self, vec: Vec2) -> Vec2:
+        """Unapply this transform and all its parent transforms to the provided
+        vector. The `vec` passed in will not be mutated.
+
+        Returns:
+            Vec2: A new Vec2 object.
+        """
+        parents_and_self: list[Transform2D] = []
+        current = self
+        while current is not None:
+            parents_and_self.append(current)
+            current = current._parent
+        for parent in reversed(parents_and_self):
+            vec = (
+                parent._mat.get_inverse()
+                * (vec - parent.translate - parent.pivot)
+                + parent.pivot
+            )
         return vec
     
     @property

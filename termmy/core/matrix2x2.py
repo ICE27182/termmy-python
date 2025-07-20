@@ -227,6 +227,8 @@ class Mat2(Matrix):
     
     @override
     def get_inverse(self) -> Mat2:
+        """Get the inverse of this 2 dimensional matrix.
+        """
         det = self.get_determinant()
         if det == 0:
             raise ValueError("The matrix is singular (determinant is 0) and does not have an inverse.")
