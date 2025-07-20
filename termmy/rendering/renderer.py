@@ -29,6 +29,7 @@ class Renderer:
     ] = RASTERIZERS
 
     anti_aliasing: MSAA | AAA | SSAA | None = None
+    scalar: float = 0.01
 
     def render(self, scene: Scene, render_context: RenderContext) -> ColorBuffer:
         """Render the scene to a new color buffer with the same dimensions
@@ -79,6 +80,9 @@ class Renderer:
                 )
             
     def render_nodes(self, scene: Scene, render_context: RenderContext) -> None:
+        w, h = render_context.width, render_context.height
+        render_context._abso_coord_scalar = self.scalar * (w*w + h*h)**0.5
+
         for node in scene._nodes:
             self._render_node(node, render_context, scene=scene)
         if isinstance(self.anti_aliasing, MSAA):
