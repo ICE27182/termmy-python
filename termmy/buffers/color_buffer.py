@@ -4,7 +4,7 @@ from __future__ import annotations
 from termmy.colors import Color
 from .buffer2d import Buffer2D
 
-from typing import override, overload, TYPE_CHECKING
+from typing import override, overload, TYPE_CHECKING, Self
 from collections.abc import Iterable
 from copy import copy
 from itertools import islice
@@ -13,6 +13,7 @@ from warnings import deprecated
 if TYPE_CHECKING:
     from termmy.display import DisplaySettings
     from .text_tag import TextTag
+    from ..rendering import SSAA
 
 
 
@@ -58,6 +59,58 @@ class ColorBuffer(Buffer2D):
         return cls(width=display_settings.width, 
                    height=display_settings.height)
 
+    def resolve_to(self, buffer: ColorBuffer, ssaa: SSAA) -> Self:
+        if (self.width != buffer.width * ssaa.level
+            or self.height != buffer.height * ssaa.level):
+            raise ValueError("Incompatible buffer dimensions.")
+        # ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        #  485    1.058    0.002    1.058    0.002 color_buffer.py:62(resolve_to) - 80x48 SSAAx2
+        #   16    8.380    0.524    8.380    0.524 color_buffer.py:62(resolve_to) - 1280x720 SSAAx2
+        squared_level = ssaa.level * ssaa.level
+        l_l = buffer.width * squared_level # I dont know how to name this :(
+        weight = 1.0 / squared_level
+        for buffer_row_starting in range(0, buffer.height * buffer.width, buffer.width):
+            self_col_starting = 0
+            for x in range(buffer.width):
+                r = g = b = a = 0.0
+                self_starting = buffer_row_starting * squared_level
+                for self_row_starting in range(self_starting,
+                                               self_starting + l_l,
+                                               self.width):
+                    for dx in range(ssaa.level):
+                        sample_color = self.data[self_row_starting + self_col_starting + dx]
+                        r += sample_color.r
+                        g += sample_color.g
+                        b += sample_color.b
+                        a += sample_color.a
+                color = buffer.data[buffer_row_starting + x]
+                color.r = r * weight
+                color.g = g * weight
+                color.b = b * weight
+                color.a = a * weight
+                self_col_starting += ssaa.level
+        return self
+        # ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        #  836    2.018    0.002    2.018    0.002 color_buffer.py:62(resolve_to) - 80x48 SSAAx2
+        #   16   10.066    0.629   10.066    0.629 color_buffer.py:62(resolve_to) - 1280x720 SSAAx2
+        weight = 1.0 / (ssaa.level * ssaa.level)
+        for y in range(buffer.height):
+            for x in range(buffer.width):
+                r = g = b = a = 0.0
+                for dy in range(ssaa.level):
+                    for dx in range(ssaa.level):
+                        sample_color = self.data[(y * ssaa.level + dy) * self.width + (x * ssaa.level + dx)]
+                        r += sample_color.r
+                        g += sample_color.g
+                        b += sample_color.b
+                        a += sample_color.a
+                color = buffer.data[y * buffer.width + x]
+                color.r = r * weight
+                color.g = g * weight
+                color.b = b * weight
+                color.a = a * weight
+        return self
+                
     @override
     def clear(self) -> None:
         for color in self.data:

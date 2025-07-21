@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from termmy.core import Vec2i
 from termmy.colors import Color
-from .msaa_patterns import MSAAPattern, MSAAoff, MSAAx2, MSAAx4, MSAAx8, MSAAx16
 from typing import overload, TYPE_CHECKING
 from warnings import deprecated
 from collections.abc import Iterable, Iterator
@@ -163,7 +162,7 @@ class Buffer2D(ABC):
     def draw_line(
             self, a: Vec2i, b: Vec2i, 
             color: Color | None = None,
-            msaa: MSAAPattern = MSAAx4
+            msaa: MSAAPattern = tuple()
         ) -> None:
         """
         Line color will be default to 
@@ -264,7 +263,7 @@ class Buffer2D(ABC):
     def draw_triangle(self, a: Vec2i, b: Vec2i, c: Vec2i, 
                       fillcolor: Color | bool = False,
                       linecolor: Color | bool = True,
-                      msaa: MSAAPattern = MSAAx4) -> None:
+                      msaa: MSAAPattern = tuple()) -> None:
         """
         Draw a triangle with the given color.
 
