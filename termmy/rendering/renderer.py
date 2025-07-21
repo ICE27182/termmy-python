@@ -50,17 +50,16 @@ class Renderer:
         
     
     def initiate_buffer(self, scene: Scene, render_context: RenderContext) -> None:
-        width = render_context.width
-        height = render_context.height
-        buffer = render_context.color_buffer
+        output_width = render_context.width
+        output_height = render_context.height
         base = scene.base
         aa = self.anti_aliasing
         if isinstance(aa, MSAA):
             buffer = render_context.ms_buffer
             if buffer is None:
-                buffer = MultisampleColorBuffer(width, height, aa)
+                buffer = MultisampleColorBuffer(output_width, output_height, aa)
                 render_context.ms_buffer = buffer
-            if base.width == width and base.height == height:
+            if base.width == output_width and base.height == output_height:
                 _initiate_matched_ms_buffer(
                     base.data,
                     aa,
@@ -73,8 +72,19 @@ class Renderer:
                     buffer,
                 )
         else:
-            buffer = render_context.color_buffer
-            if base.width == width and base.height == height:
+            if isinstance(aa, SSAA):
+                buffer = render_context.ss_buffer
+                if buffer is None:
+                    buffer = ColorBuffer(output_width*aa.level, 
+                                         output_height*aa.level)
+                    render_context.ss_buffer = buffer
+                    _initiate_unmatched_color_buffer(
+                        base,
+                        buffer,
+                    )
+            else:
+                buffer = render_context.color_buffer
+            if base.width == buffer.width and base.height == buffer.height:
                 _initiate_matched_color_buffer(
                     base.data,
                     buffer,
@@ -86,13 +96,18 @@ class Renderer:
                 )
             
     def render_nodes(self, scene: Scene, render_context: RenderContext) -> None:
-        w, h = render_context.width, render_context.height
+        aa = self.anti_aliasing
+        if isinstance(aa, SSAA):
+            w, h = render_context.ss_buffer.width, render_context.ss_buffer.height
+        else:
+            w, h = render_context.width, render_context.height
         render_context._abso_coord_scalar = self.scalar * (w*w + h*h)**0.5
-
         for node in scene._nodes:
             self._render_node(node, render_context, scene=scene)
-        if isinstance(self.anti_aliasing, MSAA):
+        if isinstance(aa, MSAA):
             render_context.ms_buffer.resolve_to(render_context.color_buffer)
+        if isinstance(aa, SSAA):
+            render_context.ss_buffer.resolve_to(render_context.color_buffer, aa)
     
     def _render_node(self, 
                      node: Node, 

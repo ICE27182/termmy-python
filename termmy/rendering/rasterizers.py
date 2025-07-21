@@ -40,27 +40,29 @@ def rasterize_dot(renderer: Renderer,
     """Rasterize a dot.
     """
     if dot.fill:
-        width = render_context.width
-        height = render_context.height
+        aa = renderer.anti_aliasing
+        use_aaa = isinstance(aa, AAA)
+        uses_msaa = isinstance(aa, MSAA)
+        use_ssaa = isinstance(aa, SSAA)
+        if use_ssaa:
+            width = render_context.ss_buffer.width
+            height = render_context.ss_buffer.height
+            data = render_context.ss_buffer.data
+        else:
+            width = render_context.width
+            height = render_context.height
+            data = (render_context.ms_buffer.data if uses_msaa
+                    else render_context.color_buffer.data)
         
         vec = dot.transform.apply(_VEC2_0_0)
         screen_x = vec.x * render_context._abso_coord_scalar
         screen_y = vec.y * render_context._abso_coord_scalar
 
         if 0.0 <= screen_x < width and 0.0 <= screen_y < height:
-            aa = renderer.anti_aliasing
-            use_aaa = isinstance(aa, AAA)
-            uses_msaa = isinstance(aa, MSAA)
-
             fill_color = dot.fill.color
-            data = (render_context.ms_buffer.data if uses_msaa
-                    else render_context.color_buffer.data)
-            
-            if use_aaa or uses_msaa:
+            if uses_msaa:
                 level = aa._level
                 sample_num = 1 << level
-            
-            if uses_msaa:
                 threshold = 1 / level
                 samples = (-threshold <= dx+dy < threshold 
                            for (dx, dy) in aa.pattern)
@@ -73,6 +75,8 @@ def rasterize_dot(renderer: Renderer,
                         old_color.b = fill_color.b
                         old_color.a = fill_color.a
             elif use_aaa:
+                level = aa._level
+                sample_num = 1 << level
                 alpha = 1 / sample_num
                 alpha_ = 1 - alpha
                 old_color = data[int(screen_y) * width + int(screen_x)]
@@ -96,8 +100,19 @@ def rasterize_simple_line(renderer: Renderer,
     fill = line.fill
     if fill:
         # Localize variables
-        width = render_context.width
-        height = render_context.height
+        aa = renderer.anti_aliasing
+        use_ssaa = isinstance(aa, SSAA)
+        use_msaa = isinstance(aa, MSAA)
+        use_aaa = isinstance(aa, AAA)
+        if use_ssaa:
+            width = render_context.ss_buffer.width
+            height = render_context.ss_buffer.height
+            data = render_context.ss_buffer.data
+        else:
+            width = render_context.width
+            height = render_context.height
+            data = (render_context.ms_buffer.data if use_msaa 
+                    else render_context.color_buffer.data)
         transform = line.transform
         coord_scalar = render_context._abso_coord_scalar
         local_start = line.start
@@ -113,9 +128,6 @@ def rasterize_simple_line(renderer: Renderer,
             return
         dir *= (dir.x*dir.x + dir.y*dir.y)**-0.5
         # AA settings
-        aa = renderer.anti_aliasing
-        use_msaa = isinstance(aa, MSAA)
-        use_aaa = isinstance(aa, AAA)
         if use_aaa or use_msaa:
             level = aa._level
             threshold = 1 / level
@@ -126,9 +138,6 @@ def rasterize_simple_line(renderer: Renderer,
         if use_aaa:
             alpha = sum(samples) / len(samples)
             alpha_ = 1.0 - alpha
-        # Localize data according to AA
-        data = (render_context.ms_buffer.data if use_msaa 
-                else render_context.color_buffer.data)
         # Local coordinates interpolation for fill
         local_diff = local_end - local_start
         iter_num = ((screen_end.x - screen_start.x) / dir.x if dir.x

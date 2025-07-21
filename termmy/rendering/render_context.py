@@ -10,6 +10,7 @@ class RenderContext:
     height: int
     color_buffer: ColorBuffer = None
     ms_buffer: MultisampleColorBuffer | None = None
+    ss_buffer: ColorBuffer | None = None
     scratch_buffer: ColorBuffer | None = None
 
     # Used to convert absolute coordinates to pixel coordinates in rendering
