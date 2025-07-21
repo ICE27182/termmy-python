@@ -2,7 +2,7 @@
 
 from .fill import Fill
 from ...colors import Color
-from ...core import Vec2, NormFloat, UV
+from ...core import Vec2, AbsoFloat, UV
 
 from typing import override
 from dataclasses import dataclass
@@ -13,7 +13,7 @@ from bisect import bisect_left
 class SolidFill(Fill):
     color: Color
     @override
-    def get_color(self, x: int, y: int) -> Color: 
+    def get_color(self, x: AbsoFloat, y: AbsoFloat) -> Color: 
         c = self.color
         return Color(c.r, c.g, c.b, c.a)
 
@@ -23,14 +23,14 @@ class LinearFill(Fill):
     end: UV
     direction: Vec2
     # hidden for maintaing order
-    _stops: list[tuple[NormFloat, Color]]
+    _stops: list[tuple[AbsoFloat, Color]]
 
     @property
-    def stops(self) -> tuple[tuple[NormFloat, Color]]:
+    def stops(self) -> tuple[tuple[AbsoFloat, Color]]:
         return tuple(self._stops)
     
     @stops.setter
-    def stops(self, values: Iterable[tuple[NormFloat, Color]]):
+    def stops(self, values: Iterable[tuple[AbsoFloat, Color]]):
         if len(values) < 2:
             raise ValueError("LinearFill must have at least two stops.")
         values = sorted(values, key=lambda v: v[0])
