@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from .render_context import RenderContext
 from .anti_aliasing import MSAA, AAA, SSAA
-from ..core import NormFloat, Vec2Rela
+from ..core import NormFloat, Vec2
 from ..colors import Color
 from ..graphics import Scene, Node, Dot, SimpleLine, Line
 
@@ -14,8 +14,7 @@ if TYPE_CHECKING:
     from .renderer import Renderer
 
 # Used internally. Supposed to be read-only
-_VEC2_1_1 = Vec2Rela(1.0, 1.0)
-_VEC2_0_0 = Vec2Rela(0.0, 0.0)
+_VEC2_0_0 = Vec2(0.0, 0.0)
 
 class Rasterizer(ABC):
     @abstractmethod
@@ -29,41 +28,60 @@ def rasterize_node(renderer: Renderer,
                    node: Node,
                    render_context: RenderContext,
                    scene: Scene | None = None):
-    """Node is only used for grouping nodes."""
+    """Rasterize a node.
+    This function has no effect as nodes are only used for grouping nodes.
+    """
     pass
 
 def rasterize_dot(renderer: Renderer,
                   dot: Dot,
                   render_context: RenderContext,
                   scene: Scene | None = None) -> None:
-    """MSAA, SSAA and AAA do not have sepcial effects on
-    the rendering of a dot.
+    """Rasterize a dot.
     """
     if dot.fill:
         width = render_context.width
         height = render_context.height
-        transform = dot.transform
-        aa = renderer.anti_aliasing
-        uses_msaa = isinstance(aa, MSAA)
-        sample_level = aa._level if uses_msaa else None
-        data = (render_context.ms_buffer.data if sample_level
-                else render_context.color_buffer.data)
         
-        vec = transform.apply(_VEC2_0_0)
-        x = round(vec.x * width)
-        y = round(vec.y * height)
-        fill_color = dot.fill.color
-        if 0 <= x < width and 0 <= y < height:
-            if uses_msaa and sample_level:
-                start = (y * width + x) << sample_level
-                for i in range(start, start + sample_level):
-                    old_color = data[i]
-                    old_color.r = fill_color.r
-                    old_color.g = fill_color.g
-                    old_color.b = fill_color.b
-                    old_color.a = fill_color.a
+        vec = dot.transform.apply(_VEC2_0_0)
+        screen_x = vec.x * render_context._abso_coord_scalar
+        screen_y = vec.y * render_context._abso_coord_scalar
+
+        if 0.0 <= screen_x < width and 0.0 <= screen_y < height:
+            aa = renderer.anti_aliasing
+            use_aaa = isinstance(aa, AAA)
+            uses_msaa = isinstance(aa, MSAA)
+
+            fill_color = dot.fill.color
+            data = (render_context.ms_buffer.data if uses_msaa
+                    else render_context.color_buffer.data)
+            
+            if use_aaa or uses_msaa:
+                level = aa._level
+                sample_num = 1 << level
+            
+            if uses_msaa:
+                threshold = 1 / level
+                samples = (-threshold <= dx+dy < threshold 
+                           for (dx, dy) in aa.pattern)
+                start = (int(screen_y) * width + int(screen_x)) << level
+                for i, sampled in enumerate(samples, start):
+                    if sampled:
+                        old_color = data[i]
+                        old_color.r = fill_color.r
+                        old_color.g = fill_color.g
+                        old_color.b = fill_color.b
+                        old_color.a = fill_color.a
+            elif use_aaa:
+                alpha = 1 / sample_num
+                alpha_ = 1 - alpha
+                old_color = data[int(screen_y) * width + int(screen_x)]
+                old_color.r = fill_color.r * alpha + old_color.r * alpha_
+                old_color.g = fill_color.g * alpha + old_color.g * alpha_
+                old_color.b = fill_color.b * alpha + old_color.b * alpha_
+                old_color.a = fill_color.a * alpha + old_color.a * alpha_
             else:
-                old_color = data[y * width + x]
+                old_color = data[int(screen_y) * width + int(screen_x)]
                 old_color.r = fill_color.r
                 old_color.g = fill_color.g
                 old_color.b = fill_color.b
@@ -74,58 +92,80 @@ def rasterize_dot(renderer: Renderer,
 def rasterize_simple_line(renderer: Renderer,
                           line: SimpleLine,
                           render_context: RenderContext,
-                          scene: Scene | None = None):
+                          scene: Scene | None = None) -> None:
     fill = line.fill
     if fill:
+        # Localize variables
         width = render_context.width
-        width_inv = 1 / width
         height = render_context.height
-        height_inv = 1 / height
-
         transform = line.transform
-        translate_x = transform.translate.x
-        translate_y = transform.translate.y
-
-        start = transform.apply(line.start)
-        end = transform.apply(line.end)
-
-        dir_x = end.x - start.x
-        dir_y = end.y - start.y
-        len_inv = (dir_x*dir_x + dir_y*dir_y) ** -0.5
-        dir_x *= len_inv * width_inv
-        # It is width_inv here below, not height_inv
-        dir_y *= len_inv * width_inv
-
-        x = start.x
-        y = start.y
-
-        sample_num = len(renderer.msaa)
-        data = (render_context.ms_buffer.data if sample_num
-                else render_context.color_buffer.data)
+        coord_scalar = render_context._abso_coord_scalar
+        local_start = line.start
+        local_end = line.end
+        # Transformation to screen coordinates
+        screen_start = transform.apply(local_start)
+        screen_end = transform.apply(local_end)
+        screen_start *= coord_scalar
+        screen_end *= coord_scalar
+        # Normalized direction vec
+        dir: Vec2 = screen_end - screen_start
+        if 0.0 == dir.x == dir.y:
+            return
+        dir *= (dir.x*dir.x + dir.y*dir.y)**-0.5
+        # AA settings
         aa = renderer.anti_aliasing
-        if isinstance(aa, MSAA):
-            pass
-        elif isinstance(aa, AAA):
-            pass
-        elif isinstance(aa, SSAA):
-            pass
-        
-        for _ in range(round(width * height_inv * ((line.width * width)**2 + (line.height * height)**2)**0.5)):
-            dis_x = round(x * width)
-            dis_y = round(y * height)
+        use_msaa = isinstance(aa, MSAA)
+        use_aaa = isinstance(aa, AAA)
+        if use_aaa or use_msaa:
+            level = aa._level
+            threshold = 1 / level
+            norm = Vec2(dir.y, -dir.x)
+            norm *= 1 / norm.length()
+            samples = tuple(-threshold <= dx*norm.x + dy*norm.y < threshold 
+                            for (dx, dy) in aa.pattern)
+        if use_aaa:
+            alpha = sum(samples) / len(samples)
+            alpha_ = 1.0 - alpha
+        # Localize data according to AA
+        data = (render_context.ms_buffer.data if use_msaa 
+                else render_context.color_buffer.data)
+        # Local coordinates interpolation for fill
+        local_diff = local_end - local_start
+        iter_num = ((screen_end.x - screen_start.x) / dir.x if dir.x
+                    else (screen_end.y - screen_start.y) / dir.y)
+        iter_num_inv = 1.0 / iter_num
+        # Starting
+        pos = Vec2(screen_start.x, screen_start.y)
+        for i in range(round(iter_num)):
+            dis_x = round(pos.x)
+            dis_y = round(pos.y)
             if 0 <= dis_x < width and 0 <= dis_y < height:
-                # TODO Add AAs
-                old_color = data[dis_y * width + dis_x]
+                interpolation_pos = i * iter_num_inv
                 fill_color = fill.get_color(
-                    x - translate_x, 
-                    y - translate_y,
+                    round(interpolation_pos * local_diff.x + local_start.x),
+                    round(interpolation_pos * local_diff.y + local_start.y),
                 )
-                old_color.r = fill_color.r
-                old_color.g = fill_color.g
-                old_color.b = fill_color.b
-                old_color.a = fill_color.a
-            x += dir_x
-            y += dir_y
+                if use_msaa:
+                    for j, sampled in enumerate(samples):
+                        if sampled:
+                            color = data[((dis_y * width + dis_x) << level) + j]
+                            color.r = fill_color.r
+                            color.g = fill_color.g
+                            color.b = fill_color.b
+                            color.a = fill_color.a
+                elif use_aaa:
+                    color: Color = data[dis_y * width + dis_x]
+                    color.r = alpha * fill_color.r + alpha_ * color.r
+                    color.g = alpha * fill_color.g + alpha_ * color.g
+                    color.b = alpha * fill_color.b + alpha_ * color.b
+                    color.a = fill_color.a
+                else:
+                    color = data[dis_y * width + dis_x]
+                    color.r = fill_color.r
+                    color.g = fill_color.g
+                    color.b = fill_color.b
+                    color.a = fill_color.a
+            pos += dir
 
 RASTERIZERS = {
     Node: rasterize_node,

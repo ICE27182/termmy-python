@@ -11,6 +11,11 @@ from ...colors import Color
 
 @dataclass(slots=True)
 class SimpleLine(Shape):
+    """A straight line with a start and end point.
+    It has no customizable weight and is always one pixel wide.
+    It draws faster but is less versatile comparing to `Line`, which
+    supports weight and stroke.
+    """
     start: Vec2 = None
     end: Vec2 = None
     fill: Fill | None = None
