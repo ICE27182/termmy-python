@@ -198,11 +198,10 @@ def apply_fxaa_to(buffer: ColorBuffer,
     scratch_buffer.data, buffer.data = buffer.data, scratch_buffer.data
     return buffer
 
-SSAAoff = SSAA(0)
+SSAAoff = None
 SSAAx2 = SSAA(2)
 SSAAx4 = SSAA(4)
 
-_SAMPLES_0 = tuple()
 _SAMPLES_2 = ((-0.25, -0.25), (0.25, 0.25))
 _SAMPLES_4 = ((-0.375, -0.125), ( 0.125, -0.375), 
               ( 0.375,  0.125), (-0.125,  0.375))
@@ -219,13 +218,13 @@ _SAMPLES_16 = ((-0.5625, -0.4375), (-0.4375, -0.5625),
                (-0.8125,  0.1875), (-0.6875,  0.4375), 
                (-0.4375,  0.8125), (-0.3125,  0.6875))
 
-MSAAoff = MSAA(_SAMPLES_0, None)
+MSAAoff = None
 MSAAx2 = MSAA(_SAMPLES_2, 1)
 MSAAx4 = MSAA(_SAMPLES_4, 2)
 MSAAx8 = MSAA(_SAMPLES_8, 3)
 MSAAx16 = MSAA(_SAMPLES_16, 4)
 
-AAAoff = AAA(_SAMPLES_0, None)
+AAAoff = None
 AAAx2 = AAA(_SAMPLES_2, 1)
 AAAx4 = AAA(_SAMPLES_4, 2)
 AAAx8 = AAA(_SAMPLES_8, 3)

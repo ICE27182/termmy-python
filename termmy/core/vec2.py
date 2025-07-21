@@ -5,34 +5,34 @@ from __future__ import annotations
 from .type_aliases import NormFloat
 
 from dataclasses import dataclass
-from typing import overload
+from typing import Self
 from abc import ABC
 from numbers import Number
 
 class _Vec2Mixin(ABC):
-    def __add__(self, other):
+    def __add__(self, other) -> Vec2:
         return Vec2(self.x + other.x, self.y + other.y)
-    def __iadd__(self, other):
+    def __iadd__(self, other) -> Self:
         self.x += other.x
         self.y += other.y
         return self
-    def __sub__(self, other):
+    def __sub__(self, other) -> Vec2:
         return Vec2(self.x - other.x, self.y - other.y)
-    def __isub__(self, other):
+    def __isub__(self, other) -> Self:
         self.x -= other.x
         self.y -= other.y
         return self
-    def __mul__(self, scalar):
+    def __mul__(self, scalar) -> Vec2:
         return Vec2(self.x * scalar, self.y * scalar)
-    def __imul__(self, scalar):
+    def __imul__(self, scalar) -> Self:
         self.x *= scalar
         self.y *= scalar
         return self
-    def dot_prod(self, other):
+    def dot_prod(self, other) -> Number:
         return self.x * other.x + self.y * other.y
-    def cross_prod(self, other):
+    def cross_prod(self, other) -> Number:
         return self.x * other.y - self.y * other.x
-    def length(self):
+    def length(self) -> float:
         return (self.x * self.x + self.y * self.y)**0.5
     def __hash__(self):
         return hash((self.x, self.y))

@@ -54,20 +54,26 @@ class Renderer:
         height = render_context.height
         buffer = render_context.color_buffer
         base = scene.base
-        if isinstance(self.anti_aliasing, MSAA):
+        aa = self.anti_aliasing
+        if isinstance(aa, MSAA):
+            buffer = render_context.ms_buffer
+            if buffer is None:
+                buffer = MultisampleColorBuffer(width, height, aa)
+                render_context.ms_buffer = buffer
             if base.width == width and base.height == height:
                 _initiate_matched_ms_buffer(
                     base.data,
-                    self.anti_aliasing,
+                    aa,
                     buffer,
                 )
             else:
                 _initiate_unmatched_ms_buffer(
                     base,
-                    self.anti_aliasing,
+                    aa,
                     buffer,
                 )
         else:
+            buffer = render_context.color_buffer
             if base.width == width and base.height == height:
                 _initiate_matched_color_buffer(
                     base.data,
@@ -139,9 +145,10 @@ def _initiate_matched_ms_buffer(base_data: tuple[Color],
     If msaa is off, this function will do nothing. 
     Use `_initiate_matched_color_buffer` instead.
     """
-    sample_num = len(msaa)
+    sample_num = len(msaa.pattern)
+    level = msaa._level
     for i, base_color in enumerate(base_data):
-        start = i * sample_num
+        start = i << level
         for j in range(sample_num):
             out_color = out.data[start + j]
             out_color.r = base_color.r
@@ -162,11 +169,12 @@ def _initiate_unmatched_ms_buffer(base: ColorBuffer,
     x_scale, y_scale = base.width/out_width, base.height/out_height
     base_data = base.data
     base_width, row_starting_index = base.width, 0
-    sample_num = len(msaa)
+    sample_num = len(msaa.pattern)
+    level = msaa._level
     for y in range(out_height):
         for x in range(out_width):
             color = base_data[int(y_scale*y)*base_width + int(x_scale*x)]
-            start = (row_starting_index + x) * sample_num
+            start = (row_starting_index + x) << level
             for j in range(sample_num):
                 old_color = out.data[start + j]
                 old_color.r = color.r
