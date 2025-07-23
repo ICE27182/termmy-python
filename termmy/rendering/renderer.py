@@ -56,7 +56,10 @@ class Renderer:
         aa = self.anti_aliasing
         if isinstance(aa, MSAA):
             buffer = render_context.ms_buffer
-            if buffer is None:
+            if (buffer is None 
+                or buffer.width != output_width 
+                or buffer.height != output_height
+                or buffer.msaa._level != aa._level):
                 buffer = MultisampleColorBuffer(output_width, output_height, aa)
                 render_context.ms_buffer = buffer
             if base.width == output_width and base.height == output_height:
@@ -74,7 +77,9 @@ class Renderer:
         else:
             if isinstance(aa, SSAA):
                 buffer = render_context.ss_buffer
-                if buffer is None:
+                if (buffer is None 
+                    or buffer.width != output_width * aa.level
+                    or buffer.height != output_height * aa.level):
                     buffer = ColorBuffer(output_width*aa.level, 
                                          output_height*aa.level)
                     render_context.ss_buffer = buffer

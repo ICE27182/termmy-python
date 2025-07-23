@@ -6,7 +6,9 @@ from .render_context import RenderContext
 from .anti_aliasing import MSAA, AAA, SSAA
 from ..core import NormFloat, Vec2
 from ..colors import Color
-from ..graphics import Scene, Node, Dot, SimpleLine, Line
+from ..graphics import Scene, Node
+from ..graphics import Dot, SimpleLine, Circle
+from ..graphics import Triangle, Rectangle, Line
 
 from typing import TYPE_CHECKING
 from abc import ABC, abstractmethod
@@ -40,9 +42,10 @@ def rasterize_dot(renderer: Renderer,
     """Rasterize a dot.
     """
     if dot.fill:
+        # Localize variables & AA
         aa = renderer.anti_aliasing
         use_aaa = isinstance(aa, AAA)
-        uses_msaa = isinstance(aa, MSAA)
+        use_msaa = isinstance(aa, MSAA)
         use_ssaa = isinstance(aa, SSAA)
         if use_ssaa:
             width = render_context.ss_buffer.width
@@ -51,16 +54,16 @@ def rasterize_dot(renderer: Renderer,
         else:
             width = render_context.width
             height = render_context.height
-            data = (render_context.ms_buffer.data if uses_msaa
+            data = (render_context.ms_buffer.data if use_msaa
                     else render_context.color_buffer.data)
-        
+        # Transformation to screen coordinates
         vec = dot.transform.apply(_VEC2_0_0)
         screen_x = vec.x * render_context._abso_coord_scalar
         screen_y = vec.y * render_context._abso_coord_scalar
-
+        # Rasterization
         if 0.0 <= screen_x < width and 0.0 <= screen_y < height:
             fill_color = dot.fill.color
-            if uses_msaa:
+            if use_msaa:
                 level = aa._level
                 sample_num = 1 << level
                 threshold = 1 / level
@@ -91,15 +94,13 @@ def rasterize_dot(renderer: Renderer,
                 old_color.b = fill_color.b
                 old_color.a = fill_color.a
 
-
-
 def rasterize_simple_line(renderer: Renderer,
                           line: SimpleLine,
                           render_context: RenderContext,
                           scene: Scene | None = None) -> None:
     fill = line.fill
     if fill:
-        # Localize variables
+        # Localize variables & AA
         aa = renderer.anti_aliasing
         use_ssaa = isinstance(aa, SSAA)
         use_msaa = isinstance(aa, MSAA)
@@ -143,7 +144,7 @@ def rasterize_simple_line(renderer: Renderer,
         iter_num = ((screen_end.x - screen_start.x) / dir.x if dir.x
                     else (screen_end.y - screen_start.y) / dir.y)
         iter_num_inv = 1.0 / iter_num
-        # Starting
+        # Rasterization
         pos = Vec2(screen_start.x, screen_start.y)
         for i in range(round(iter_num)):
             dis_x = round(pos.x)
@@ -176,8 +177,114 @@ def rasterize_simple_line(renderer: Renderer,
                     color.a = fill_color.a
             pos += dir
 
+def rasterize_circle(renderer: Renderer,
+                     circle: Circle,
+                     render_context: RenderContext,
+                     scene: Scene | None = None) -> None:
+    # Localize variables & AA
+    aa = renderer.anti_aliasing
+    use_aaa = isinstance(aa, AAA)
+    use_msaa = isinstance(aa, MSAA)
+    use_ssaa = isinstance(aa, SSAA)
+    if use_ssaa:
+        width = render_context.ss_buffer.width
+        height = render_context.ss_buffer.height
+        data = render_context.ss_buffer.data
+    else:
+        width = render_context.width
+        height = render_context.height
+        data = (render_context.ms_buffer.data if use_msaa
+                else render_context.color_buffer.data)
+    if use_aaa or use_msaa:
+        level = aa._level
+        pattern = aa.pattern
+        sample_num = 1 << level
+    scalar = render_context._abso_coord_scalar
+    screen_radius = circle.radius * scalar
+    screen_radius_squared = screen_radius * screen_radius
+    # Transformation to screen coordinates
+    vec = circle.transform.apply(_VEC2_0_0)
+    screen_x = vec.x * scalar
+    screen_y = vec.y * scalar
+    # Local coordinates interpolation for fill
+    local_increament = circle.radius / screen_radius
+    fill = circle.fill
+    # Rasterization
+    abso_v = 0.0
+    y_first_row = round(screen_y - screen_radius)
+    row_starting = y_first_row * width
+    for y in range(y_first_row, 
+                   round(screen_y + screen_radius) + 1):
+        if 0 <= y < height:
+            abso_u = 0.0
+            for x in range(round(screen_x - screen_radius), 
+                           round(screen_x + screen_radius) + 1):
+                if 0 <= x < width:
+                    fill_color = fill.get_color(abso_u, abso_v)
+                    diff_x = x - screen_x
+                    diff_y = y - screen_y
+                    if use_msaa:
+                        samples = ((diff_x+dx)*(diff_x+dx) 
+                                   + (diff_y+dy)*(diff_y+dy) 
+                                   <= screen_radius_squared 
+                                   for dx, dy in pattern)
+                        for i, sampled in enumerate(samples, (row_starting + x) << level):
+                            if sampled:
+                                old_color = data[i]
+                                old_color.r = fill_color.r
+                                old_color.g = fill_color.g
+                                old_color.b = fill_color.b
+                                old_color.a = fill_color.a
+                    elif use_aaa:
+                        samples = ((diff_x+dx)*(diff_x+dx) 
+                                   + (diff_y+dy)*(diff_y+dy) 
+                                   <= screen_radius_squared 
+                                   for dx, dy in pattern)
+                        alpha = sum(samples) / sample_num
+                        alpha_ = 1.0 - alpha
+                        old_color = data[row_starting + x]
+                        old_color.r = alpha * fill_color.r + alpha_ * old_color.r
+                        old_color.g = alpha * fill_color.g + alpha_ * old_color.g
+                        old_color.b = alpha * fill_color.b + alpha_ * old_color.b
+                        old_color.a = fill_color.a
+                    else:
+                       
+                        if diff_x*diff_x + diff_y*diff_y <= screen_radius_squared:
+                            old_color = data[row_starting + x]
+                            old_color.r = fill_color.r
+                            old_color.g = fill_color.g
+                            old_color.b = fill_color.b
+                            old_color.a = fill_color.a
+                    abso_u += local_increament
+        abso_v += local_increament
+        row_starting += width
+
+
+
+def rasterize_triangle(renderer: Renderer,
+                       triangle: Triangle,
+                       render_context: RenderContext,
+                       scene: Scene | None = None) -> None:
+    raise NotImplementedError
+
+def rasterize_rectangle(renderer: Renderer,
+                        rectangle: Rectangle,
+                        render_context: RenderContext,
+                        scene: Scene | None = None) -> None:
+    raise NotImplementedError
+
+def rasterize_line(renderer: Renderer,
+                   line: Line,
+                   render_context: RenderContext,
+                   scene: Scene | None = None) -> None:
+    raise NotImplementedError
+
 RASTERIZERS = {
     Node: rasterize_node,
     Dot: rasterize_dot,
-    SimpleLine: rasterize_simple_line
+    SimpleLine: rasterize_simple_line,
+    Circle: rasterize_circle,
+    Triangle: rasterize_triangle,
+    Rectangle: rasterize_rectangle,
+    Line: rasterize_line,
 }
