@@ -20,9 +20,6 @@ class SimpleLine(Shape):
     end: Vec2 = None
     fill: Fill | None = None
 
-    width: float = field(init=False)
-    height: float = field(init=False)
-
     def __post_init__(self):
         self.width = abs(self.end.x - self.start.x)
         self.height = abs(self.end.y - self.start.y)

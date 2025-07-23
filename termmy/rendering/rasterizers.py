@@ -6,7 +6,9 @@ from .render_context import RenderContext
 from .anti_aliasing import MSAA, AAA, SSAA
 from ..core import NormFloat, Vec2
 from ..colors import Color
-from ..graphics import Scene, Node, Dot, SimpleLine, Line
+from ..graphics import Scene, Node
+from ..graphics import Dot, SimpleLine, Circle
+from ..graphics import Triangle, Rectangle, Line
 
 from typing import TYPE_CHECKING
 from abc import ABC, abstractmethod
@@ -176,8 +178,36 @@ def rasterize_simple_line(renderer: Renderer,
                     color.a = fill_color.a
             pos += dir
 
+def rasterize_circle(renderer: Renderer,
+                     circle: Circle,
+                     render_context: RenderContext,
+                     scene: Scene | None = None) -> None:
+    raise NotImplementedError
+
+def rasterize_triangle(renderer: Renderer,
+                       triangle: Triangle,
+                       render_context: RenderContext,
+                       scene: Scene | None = None) -> None:
+    raise NotImplementedError
+
+def rasterize_rectangle(renderer: Renderer,
+                        rectangle: Rectangle,
+                        render_context: RenderContext,
+                        scene: Scene | None = None) -> None:
+    raise NotImplementedError
+
+def rasterize_line(renderer: Renderer,
+                   line: Line,
+                   render_context: RenderContext,
+                   scene: Scene | None = None) -> None:
+    raise NotImplementedError
+
 RASTERIZERS = {
     Node: rasterize_node,
     Dot: rasterize_dot,
-    SimpleLine: rasterize_simple_line
+    SimpleLine: rasterize_simple_line,
+    Circle: rasterize_circle,
+    Triangle: rasterize_triangle,
+    Rectangle: rasterize_rectangle,
+    Line: rasterize_line,
 }
