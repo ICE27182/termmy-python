@@ -2,13 +2,15 @@
 
 from typing import overload
 
+from ..node import Node
+from ..fills import Fill, SolidFill, FillFactory
+from ..stroke import Stroke
+from ...core import Vec2, AbsoFloat, Transform2D
+from ...colors import Color, Colors
 from .shape import Shape
 from .dot import Dot
 from .line import SimpleLine
-from ..node import Node
-from ..fills import Fill, SolidFill, FillFactory
-from ...core import Vec2, AbsoFloat, Transform2D
-from ...colors import Color, Colors
+from .circle import Circle
 
 class ShapeFactory:
     @staticmethod
@@ -179,6 +181,42 @@ class ShapeFactory:
                                   _parent= None if parent_node is None else parent_node.transform),
             _parent=parent_node,
         ).add_child(start_dot).add_child(end_dot).add_child(line)
+    
+    @staticmethod
+    def create_circle_at(x: AbsoFloat,
+                         y: AbsoFloat,
+                         radius: AbsoFloat,
+                         fill: Fill | None | bool = True,
+                         stroke: Stroke | None = None,
+                         z: float = 0.0,
+                         parent_node: Node | None = None) -> Circle:
+        """Create a circle at the specified position with optional fill and stroke.
+        Args:
+            x (AbsoFloat): The x-coordinate of the circle.
+            y (AbsoFloat): The y-coordinate of the circle.
+            radius (AbsoFloat): The radius of the circle.
+            fill (Fill | None | bool): The fill color of the circle. 
+                - If True is passed, defaults to an orange solid fill.
+                - If None or False is passed, no fill will be set to None.
+            stroke (Stroke | None): The stroke of the circle.
+            z (float): The depth of the circle.
+            parent_node (Node | None): The optional parent node of the circle.
+        """
+        fill = fill if isinstance(fill, Fill) else SolidFill(Colors.orange()) if fill else None
+        return Circle(
+            radius=radius,
+            fill=fill,
+            stroke=stroke,
+            z=z,
+            transform=Transform2D(
+                translate=Vec2(x, y),
+                pivot=Vec2(x, y),
+                # No circular ref here because it's a new object
+                _parent= None if parent_node is None else parent_node.transform,
+            ),
+            # No circular ref here because it's a new object
+            _parent=parent_node,
+        )
 
 
     
