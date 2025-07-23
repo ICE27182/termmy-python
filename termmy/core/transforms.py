@@ -49,9 +49,9 @@ class Transform2D:
             Vec2: A new Vec2 object.
         """
         current = self
+        inherit = TransformInheritance.ALL
         new_vec = Vec2(vec.x, vec.y)
         while current is not None:
-            inherit = current.inheritance
             new_vec -= current.pivot
             if inherit & TransformInheritance.SCALE:
                 new_vec *= current.scale
@@ -60,6 +60,7 @@ class Transform2D:
             new_vec += current.pivot
             if inherit & TransformInheritance.TRANSLATE:
                 new_vec += current.translate
+            inherit = current.inheritance
             current = current._parent
         return new_vec
     
@@ -88,6 +89,17 @@ class Transform2D:
                 new_vec *= 1.0 / parent.scale
             new_vec += parent.pivot
         return new_vec
+
+    def get_scale_factor(self) -> float:
+        current = self
+        inherit = TransformInheritance.SCALE
+        v = 1.0
+        while current is not None:
+            if inherit & TransformInheritance.SCALE:
+                v *= current.scale
+            inherit = current.inheritance
+            current = current._parent
+        return v
     
     @property
     def rotation_radians(self) -> float:

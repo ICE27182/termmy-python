@@ -200,12 +200,13 @@ def rasterize_circle(renderer: Renderer,
         pattern = aa.pattern
         sample_num = 1 << level
     scalar = render_context._abso_coord_scalar
-    screen_radius = circle.radius * scalar
-    screen_radius_squared = screen_radius * screen_radius
     # Transformation to screen coordinates
     vec = circle.transform.apply(_VEC2_0_0)
     screen_x = vec.x * scalar
     screen_y = vec.y * scalar
+    radius = circle.radius * circle.transform.get_scale_factor()
+    screen_radius = radius * scalar
+    screen_radius_squared = screen_radius * screen_radius
     # Local coordinates interpolation for fill
     local_increament = circle.radius / screen_radius
     fill = circle.fill
