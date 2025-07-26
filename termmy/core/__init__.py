@@ -8,3 +8,4 @@ from .transforms import TransformInheritance, Transform2D
 from .progress_bar import process_bar
 from .get_path_extension import get_path_extension
 from .clear_screen import clear_screen
+from .vertices import Vertex2
