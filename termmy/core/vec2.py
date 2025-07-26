@@ -34,41 +34,25 @@ class _Vec2Mixin(ABC):
         return self.x * other.y - self.y * other.x
     def length(self) -> float:
         return (self.x * self.x + self.y * self.y)**0.5
-    def __hash__(self):
-        return hash((self.x, self.y))
 
 @dataclass(slots=True)
 class Vec2i(_Vec2Mixin):
     x: int
     y: int
-    def __eq__(self, other):
-        return (isinstance(other, Vec2i) 
-                and self.x == other.x and self.y == other.y)
 
 @dataclass(slots=True)
 class Vec2(_Vec2Mixin):
     x: float
     y: float
-    def __eq__(self, other):
-        return (isinstance(other, Vec2) 
-                and self.x == other.x and self.y == other.y)
 @dataclass(slots=True)
 class Vec2Rela(_Vec2Mixin):
     x: NormFloat
     y: NormFloat
-    def __eq__(self, other):
-        return (isinstance(other, Vec2) 
-                and self.x == other.x and self.y == other.y)
 
 @dataclass(slots=True)
 class UV:
     u: NormFloat
     v: NormFloat
-    def __hash__(self):
-        return hash((self.u, self.v))
-    def __eq__(self, other):
-        return (isinstance(other, UV) 
-                and self.u == other.u and self.v == other.v)
 
 if __name__ == "__main__":
     d = {Vec2i(1, 2): 0, Vec2i(4, 3): 1}
