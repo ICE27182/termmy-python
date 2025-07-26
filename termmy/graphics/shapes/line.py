@@ -1,13 +1,11 @@
 
 
-from dataclasses import dataclass, field
-from typing import override
+from dataclasses import dataclass
 
 from .shape import Shape
 from ..fills import Fill
 from ..stroke import Stroke
-from ...core import Vec2, AbsoFloat
-from ...colors import Color
+from ...core import AbsoFloat, Vertex2
 
 @dataclass(slots=True)
 class SimpleLine(Shape):
@@ -16,8 +14,8 @@ class SimpleLine(Shape):
     It draws faster but is less versatile comparing to `Line`, which
     supports weight and stroke.
     """
-    start: Vec2 = None
-    end: Vec2 = None
+    start: Vertex2 = None
+    end: Vertex2 = None
     fill: Fill | None = None
 
     def slope(self) -> float:

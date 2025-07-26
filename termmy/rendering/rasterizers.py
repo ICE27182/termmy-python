@@ -12,6 +12,7 @@ from ..graphics import Triangle, Rectangle, Line
 
 from typing import TYPE_CHECKING
 from abc import ABC, abstractmethod
+from math import ceil, floor
 if TYPE_CHECKING:
     from .renderer import Renderer
 
@@ -116,11 +117,9 @@ def rasterize_simple_line(renderer: Renderer,
                     else render_context.color_buffer.data)
         transform = line.transform
         coord_scalar = render_context._abso_coord_scalar
-        local_start = line.start
-        local_end = line.end
         # Transformation to screen coordinates
-        screen_start = transform.apply(local_start)
-        screen_end = transform.apply(local_end)
+        screen_start = transform.apply(line.start)
+        screen_end = transform.apply(line.end)
         screen_start *= coord_scalar
         screen_end *= coord_scalar
         # Normalized direction vec
@@ -140,11 +139,14 @@ def rasterize_simple_line(renderer: Renderer,
             alpha = sum(samples) / len(samples)
             alpha_ = 1.0 - alpha
         # Local coordinates interpolation for fill
-        local_diff = local_end - local_start
+        start_u = line.start.u
+        start_v = line.start.v
+        u_diff = line.end.u - start_u
+        v_diff = line.end.v - start_v
+        # Rasterization
         iter_num = ((screen_end.x - screen_start.x) / dir.x if dir.x
                     else (screen_end.y - screen_start.y) / dir.y)
         iter_num_inv = 1.0 / iter_num
-        # Rasterization
         pos = Vec2(screen_start.x, screen_start.y)
         for i in range(round(iter_num)):
             dis_x = round(pos.x)
@@ -152,8 +154,8 @@ def rasterize_simple_line(renderer: Renderer,
             if 0 <= dis_x < width and 0 <= dis_y < height:
                 interpolation_pos = i * iter_num_inv
                 fill_color = fill.get_color(
-                    round(interpolation_pos * local_diff.x + local_start.x),
-                    round(interpolation_pos * local_diff.y + local_start.y),
+                    round(interpolation_pos * u_diff + start_u),
+                    round(interpolation_pos * v_diff + start_v),
                 )
                 if use_msaa:
                     for j, sampled in enumerate(samples):
@@ -266,7 +268,45 @@ def rasterize_triangle(renderer: Renderer,
                        triangle: Triangle,
                        render_context: RenderContext,
                        scene: Scene | None = None) -> None:
-    raise NotImplementedError
+    transform = triangle.transform
+    a = transform.apply(triangle.a)
+    b = transform.apply(triangle.b)
+    c = transform.apply(triangle.c)
+    # Manually sort vertices by y-coordinate
+    if a.y > b.y:
+        a, b = b, a
+    if a.y > c.y:
+        a, c = c, a
+    if b.y > c.y:
+        b, c = c, b
+    # We calculate the left and right t-slopes of the triangle
+    # before entering the flat top or flat bottom triangle functions,
+    # so we can reuse the slope calculated to split a regular triangle
+    # into
+    #
+    # Flat top triangles
+    if a.y == b.y:
+        if a.x > b.x:
+            a, b = b, a
+        t_left = (c.x - a.x) / (c.y - a.y)
+        t_right = (c.x - b.x) / (c.y - b.y)
+        _rasterize_flat_top_triangle(renderer, t_left, t_right, a, b, c, triangle, render_context, scene)
+    # Flat bottom triangles
+    elif b.y == c.y:
+        if b.x > c.x:
+            b, c = c, b
+        t_left = (b.x - a.x) / (b.y - a.y)
+        t_right = (c.x - a.x) / (c.y - a.y)
+        _rasterize_flat_bottom_triangle(renderer, t_left, t_right, a, b, c, triangle, render_context, scene)
+    # Regular triangles
+    else:
+        # Split the triangle into two triangles
+        t_left = (b.x - a.x) / (b.y - a.y)
+        t_right = (c.x - a.x) / (c.y - a.y)
+        mid = Vec2(a.x + (b.y - a.y) * t_left, b.y)
+        _rasterize_flat_top_triangle(renderer, t_left, t_right, a, b, mid, triangle, render_context, scene)
+        _rasterize_flat_bottom_triangle(renderer, t_left, t_right, b, mid, c, triangle, render_context, scene)
+
 
 def rasterize_rectangle(renderer: Renderer,
                         rectangle: Rectangle,
@@ -278,6 +318,43 @@ def rasterize_line(renderer: Renderer,
                    line: Line,
                    render_context: RenderContext,
                    scene: Scene | None = None) -> None:
+    raise NotImplementedError
+
+def _rasterize_flat_top_triangle(renderer: Renderer,
+                                 t_left: float,
+                                 t_right: float,
+                                 left: Vec2,
+                                 right: Vec2,
+                                 bottom: Vec2,
+                                 triangle: Triangle,
+                                 render_context: RenderContext,
+                                 scene: Scene | None = None) -> None:
+    # Localize variables
+    width = render_context.width
+    height = render_context.height
+    # Rasterization
+    for y in range(round(left.y), round(bottom.y) + 1):
+        if 0 <= y < height:
+            # Calculate the x-coordinates of the left and right edges
+            x_left = bottom.x + (y - bottom.y) * t_left
+            x_right = bottom.x + (y - bottom.y) * t_right
+            # Apply AA on the edges
+
+            # Rasterize the pixels between the left and right edges
+            for x in range(ceil(x_left), ceil(x_right) + 1):
+                if 0 <= x < width:
+                    color = triangle.fill.get_color(x, y)
+                    render_context.color_buffer.data[y * width + x] = color
+
+def _rasterize_flat_bottom_triangle(renderer: Renderer,
+                            t_left: float,
+                            t_right: float,
+                               top: Vec2,
+                                 left: Vec2,
+                                 right: Vec2,
+                                triangle: Triangle,
+                                render_context: RenderContext,
+                                scene: Scene | None = None) -> None:
     raise NotImplementedError
 
 RASTERIZERS = {

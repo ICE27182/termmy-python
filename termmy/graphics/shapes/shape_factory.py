@@ -1,13 +1,10 @@
 
 
-from typing import overload
-
 from ..node import Node
-from ..fills import Fill, SolidFill, FillFactory
+from ..fills import Fill, SolidFill
 from ..stroke import Stroke
-from ...core import Vec2, AbsoFloat, Transform2D
-from ...colors import Color, Colors
-from .shape import Shape
+from ...core import Vec2, Vertex2, AbsoFloat, Transform2D
+from ...colors import Colors
 from .dot import Dot
 from .line import SimpleLine
 from .circle import Circle
@@ -77,9 +74,9 @@ class ShapeFactory:
         )
 
     @staticmethod
-    def create_simple_line_from_points(
-        start: Vec2, 
-        end: Vec2,
+    def create_simple_line_from_vertices(
+        start: Vertex2, 
+        end: Vertex2,
         fill: Fill | None = None,
         z: float = 0.0,
         parent_node: Node | None = None
@@ -87,9 +84,9 @@ class ShapeFactory:
         """Create a simple line from two points.
         
         Args:
-            start (Vec2Rela): The starting point of the line. 
+            start (Vertex2): The starting point of the line. 
                 Will be stored as a reference in the returned object
-            end (Vec2Rela): The ending point of the line.
+            end (Vertex2): The ending point of the line.
                 Will be stored as a reference in the returned object
             fill (Fill | None): The fill of the line. 
                 Defaults to a gray solid fill if not provided.
@@ -112,7 +109,7 @@ class ShapeFactory:
                           # No circular ref here because it's a new object
                           _parent=parent_node)
     @staticmethod
-    def create_simple_line_from_dots(
+    def create_simple_line_between_dots(
         start_dot: Dot,
         end_dot: Dot,
         fill: Fill | None = None,
@@ -120,67 +117,32 @@ class ShapeFactory:
         parent_node: Node | None = None
     ) -> SimpleLine:
         """Create a simple line between two dots.
+        The uv coordinates of the line will be set to (0.0, 0.0)
+        for the starting point and (1.0, 1.0) for the ending point.
 
         Args:
-            start_dot (Dot): The starting dot of the line.
-                Its translate will be stored as a reference as the starting
-                point of the line.
+            start_dot (Dot): The starting dot of the line. 
+                The dot's translate will not be stored as a reference, so
+                the starting point of the line will not move as the dot moves
+                and vice versa.
             end_dot (Dot): The ending dot of the line.
-                Its translate will be stored as a reference as the ending
-                point of the line.
+                The dot's translate will not be stored as a reference, so
+                the ending point of the line will not move as the dot moves
+                and vice versa.
             fill (Fill | None): The fill of the line. 
                 Defaults to a gray solid fill if not provided.
             z (float): The depth of the line.
             parent_node (Node | None): The optional parent node of the line.
         """
-        return ShapeFactory.create_simple_line_from_points(
-            start=start_dot.transform.translate,
-            end=end_dot.transform.translate,
+        start_vec = start_dot.transform.translate
+        end_vec = end_dot.transform.translate
+        return ShapeFactory.create_simple_line_from_vertices(
+            start=Vertex2(start_vec.x, start_vec.y, 0.0, 0.0),
+            end=Vertex2(end_vec.x, end_vec.y, 1.0, 1.0),
             fill=fill,
             z=z,
             parent_node=parent_node,
         )
-    @staticmethod
-    def create_simple_line_with_two_ends(
-        start: Vec2, 
-        end: Vec2,
-        z: float = 0.0,
-        parent_node: Node | None = None
-    ) -> Node:
-        """Create node with a green simple line with two endpoints. 
-        The starting point will be colored red 
-        and the ending point will be colored blue.
-
-        Args:
-            start (Vec2Rela): The starting point of the line. 
-                Will be stored as references in the returned object
-            end (Vec2Rela): The ending point of the line.
-                Will be stored as references in the returned object
-            z (float): The depth of the line.
-            parent_node (Node | None): The optional parent node of the line.
-        """
-        start_dot = ShapeFactory.create_dot_with_vec(
-            start, 
-            fill=SolidFill(Colors.red()),
-            z=1.0,
-        )
-        end_dot = ShapeFactory.create_dot_with_vec(
-            end, 
-            fill=SolidFill(Colors.blue()),
-            z=1.0,
-        )
-        line = ShapeFactory.create_simple_line_from_dots(
-            start_dot=start_dot,
-            end_dot=end_dot,
-            fill=SolidFill(Colors.green()),
-            z=0,
-        )
-        return Node(
-            z=z, 
-            transform=Transform2D(pivot=line.transform.pivot,
-                                  _parent= None if parent_node is None else parent_node.transform),
-            _parent=parent_node,
-        ).add_child(start_dot).add_child(end_dot).add_child(line)
     
     @staticmethod
     def create_circle_at(x: AbsoFloat,
