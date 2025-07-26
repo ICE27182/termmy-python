@@ -100,6 +100,27 @@ class Transform2D:
             inherit = current.inheritance
             current = current._parent
         return v
+
+    def apply_rotation(self, vec: Vec2) -> Vec2:
+        """Apply only the rotation of this transform
+        and all its parent transforms.
+        
+        The `vec` passed in will not be mutated.
+
+        Returns:
+            Vec2: A new Vec2 object.
+        """
+        current = self
+        inherit = TransformInheritance.ROTATE
+        new_vec = Vec2(vec.x, vec.y)
+        while current is not None:
+            if inherit & TransformInheritance.ROTATE:
+                new_vec -= current.pivot
+                new_vec = current._rot_mat * new_vec
+                new_vec += current.pivot
+            inherit = current.inheritance
+            current = current._parent
+        return new_vec
     
     @property
     def rotation_radians(self) -> float:
