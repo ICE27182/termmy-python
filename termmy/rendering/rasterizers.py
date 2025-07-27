@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from .render_context import RenderContext
 from .anti_aliasing import MSAA, AAA, SSAA
-from ..core import NormFloat, Vec2
+from ..core import NormFloat, Vec2, Vertex2
 from ..colors import Color
-from ..graphics import Scene, Node
+from ..graphics import Scene, Node, Fill
 from ..graphics import Dot, SimpleLine, Circle
 from ..graphics import Triangle, Rectangle, Line
 
@@ -270,9 +270,9 @@ def rasterize_triangle(renderer: Renderer,
                        render_context: RenderContext,
                        scene: Scene | None = None) -> None:
     transform = triangle.transform
-    a = transform.apply(triangle.a)
-    b = transform.apply(triangle.b)
-    c = transform.apply(triangle.c)
+    a = transform.apply(triangle.a) * render_context._abso_coord_scalar
+    b = transform.apply(triangle.b) * render_context._abso_coord_scalar
+    c = transform.apply(triangle.c) * render_context._abso_coord_scalar
     # Manually sort vertices by y-coordinate
     if a.y > b.y:
         a, b = b, a
@@ -302,11 +302,21 @@ def rasterize_triangle(renderer: Renderer,
     # Regular triangles
     else:
         # Split the triangle into two triangles
-        t_left = (b.x - a.x) / (b.y - a.y)
-        t_right = (c.x - a.x) / (c.y - a.y)
-        mid = Vec2(a.x + (b.y - a.y) * t_left, b.y)
-        _rasterize_flat_top_triangle(renderer, t_left, t_right, a, b, mid, triangle, render_context, scene)
-        _rasterize_flat_bottom_triangle(renderer, t_left, t_right, b, mid, c, triangle, render_context, scene)
+        t_ab = (b.x - a.x) / (b.y - a.y)
+        t_ac = (c.x - a.x) / (c.y - a.y)
+        t_bc = (b.x - c.x) / (b.y - c.y)
+        mid_x = a.x + (b.y - a.y) * t_ac
+        t_uv = (b.y - a.y) / (c.y - a.y)
+        t_uv_ = 1.0 - t_uv
+        mid = Vertex2(mid_x, b.y, 
+                      a.u * t_uv_ + c.u * t_uv, 
+                      a.v * t_uv_ + c.v * t_uv)
+        if mid_x < b.x:
+            _rasterize_flat_bottom_triangle(renderer, t_ac, t_ab, a, mid, b, triangle, render_context, scene)
+            _rasterize_flat_top_triangle(renderer, t_ac, t_bc, mid, b, c, triangle, render_context, scene)
+        else:
+            _rasterize_flat_bottom_triangle(renderer, t_ab, t_ac, a, b, mid, triangle, render_context, scene)
+            _rasterize_flat_top_triangle(renderer, t_bc, t_ac, b, mid, c, triangle, render_context, scene)
 
 
 def rasterize_rectangle(renderer: Renderer,
@@ -321,42 +331,222 @@ def rasterize_line(renderer: Renderer,
                    scene: Scene | None = None) -> None:
     raise NotImplementedError
 
+def _rasterize_row(
+                   x_left: float,
+                   x_right: float,
+                   y: float,
+                   width: int,
+                   u_left: float,
+                   v_left: float,
+                   u_right: float,
+                   v_right: float,
+                   fill: Fill,
+                   data: tuple[Color],
+                   use_msaa: bool, 
+                   use_aaa: bool,
+                   sample_num: int = 0,
+                   level: int = 0,
+                   pattern: tuple[tuple[float, float, float]] = tuple(),
+                   alpha_increament: float = 0.0) -> None:
+    # one pixel should be rendered when  x_right equals x_left
+    x_diff = 1 + x_right - x_left
+    # Apply AA on the edges and rasterize
+    if use_aaa:
+        alpha_left = alpha_right = 0.0
+        for dx, left_edge_dx, right_edge_dx in pattern:
+            if left_edge_dx + x_left <= round(x_left) + dx:
+                alpha_left += alpha_increament
+            if round(x_right) + dx <= right_edge_dx + x_right:
+                alpha_right += alpha_increament
+        # Left edge
+        alpha_left_ = 1 - alpha_left
+        new_color_left = fill.get_color(u_left, v_left)
+        old_color_left = data[round(y * width) + round(x_left)]
+        old_color_left.r = new_color_left.r * alpha_left + old_color_left.r * alpha_left_
+        old_color_left.g = new_color_left.g * alpha_left + old_color_left.g * alpha_left_
+        old_color_left.b = new_color_left.b * alpha_left + old_color_left.b * alpha_left_
+        old_color_left.a = new_color_left.a
+        # Right edge
+        alpha_right_ = 1 - alpha_right
+        new_color_right = fill.get_color(u_right, v_right)
+        old_color_right = data[round(y * width) + round(x_right)]
+        old_color_right.r = new_color_right.r * alpha_right + old_color_right.r * alpha_right_
+        old_color_right.g = new_color_right.g * alpha_right + old_color_right.g * alpha_right_
+        old_color_right.b = new_color_right.b * alpha_right + old_color_right.b * alpha_right_
+        old_color_right.a = new_color_right.a
+        # Rasterize the pixels between the left and right edges
+        for x in range(ceil(x_left), floor(x_right) + 1):
+            if 0 <= x < width:
+                # UV
+                tx = (x - x_left) / x_diff
+                tx_ = 1.0 - tx
+                u = u_left * tx_ + u_right * tx
+                v = v_left * tx_ + v_right * tx
+                new_color = fill.get_color(u, v)
+                old_color = data[round(y * width) + x]
+                old_color.r = new_color.r
+                old_color.g = new_color.g
+                old_color.b = new_color.b
+                old_color.a = new_color.a
+    elif use_msaa:
+        new_color_left = fill.get_color(u_left, v_left)
+        new_color_right = fill.get_color(u_right, v_right)
+        left_index_start = (round(y * width) + round(x_left)) << level
+        right_index_start = (round(y * width) + round(x_right)) << level
+        for i, (dx, left_edge_dx, right_edge_dx) in enumerate(pattern):
+            if left_edge_dx + x_left <= round(x_left) + dx:
+                old_color_left = data[left_index_start + i]
+                old_color_left.r = new_color_left.r
+                old_color_left.g = new_color_left.g
+                old_color_left.b = new_color_left.b
+                old_color_left.a = new_color_left.a
+            if round(x_right) + dx <= right_edge_dx + x_right:
+                old_color_right = data[right_index_start + i]
+                old_color_right.r = new_color_right.r
+                old_color_right.g = new_color_right.g
+                old_color_right.b = new_color_right.b
+                old_color_right.a = new_color_right.a
+        # Rasterize the pixels between the left and right edges
+        for x in range(ceil(x_left), floor(x_right) + 1):
+            if 0 <= x < width:
+                # UV
+                tx = (x - x_left) / x_diff
+                tx_ = 1.0 - tx
+                u = u_left * tx_ + u_right * tx
+                v = v_left * tx_ + v_right * tx
+                new_color = fill.get_color(u, v)
+                start = (round(y * width) + x) << level
+                for old_color in data[start : start + sample_num]:
+                    old_color.r = new_color.r
+                    old_color.g = new_color.g
+                    old_color.b = new_color.b
+                    old_color.a = new_color.a
+    else:
+        # Rasterize the pixels between the left and right edges
+        for x in range(round(x_left), round(x_right) + 1):
+            if 0 <= x < width:
+                # UV
+                tx = (x - x_left) / x_diff
+                tx_ = 1.0 - tx
+                u = u_left * tx_ + u_right * tx
+                v = v_left * tx_ + v_right * tx
+                new_color = fill.get_color(u, v)
+                old_color = data[round(y * width) + x]
+                old_color.r = new_color.r
+                old_color.g = new_color.g
+                old_color.b = new_color.b
+                old_color.a = new_color.a
+
 def _rasterize_flat_top_triangle(renderer: Renderer,
                                  t_left: float,
                                  t_right: float,
-                                 left: Vec2,
-                                 right: Vec2,
-                                 bottom: Vec2,
+                                 left: Vertex2,
+                                 right: Vertex2,
+                                 bottom: Vertex2,
                                  triangle: Triangle,
                                  render_context: RenderContext,
                                  scene: Scene | None = None) -> None:
-    # Localize variables
-    width = render_context.width
-    height = render_context.height
+    # Localize variables & AA
+    aa = renderer.anti_aliasing
+    use_ssaa = isinstance(aa, SSAA)
+    use_msaa = isinstance(aa, MSAA)
+    use_aaa = isinstance(aa, AAA)
+    if use_ssaa:
+        width = render_context.ss_buffer.width
+        height = render_context.ss_buffer.height
+        data = render_context.ss_buffer.data
+    else:
+        width = render_context.width
+        height = render_context.height
+        data = (render_context.ms_buffer.data if use_msaa 
+                else render_context.color_buffer.data)
+    pattern = level = sample_num = alpha_increament = None
+    if use_msaa or use_aaa:
+        pattern = tuple((dx, dy * t_left, dy * t_right) for dx, dy in aa.pattern)
+        level = aa._level
+        sample_num = 1 << level
+        alpha_increament = 1 / len(pattern)
+    fill = triangle.fill
+    # Preparation for uv interpolation
+    y_diff = bottom.y - left.y
     # Rasterization
     for y in range(round(left.y), round(bottom.y) + 1):
         if 0 <= y < height:
             # Calculate the x-coordinates of the left and right edges
             x_left = bottom.x + (y - bottom.y) * t_left
             x_right = bottom.x + (y - bottom.y) * t_right
-            # Apply AA on the edges
-
-            # Rasterize the pixels between the left and right edges
-            for x in range(ceil(x_left), ceil(x_right) + 1):
-                if 0 <= x < width:
-                    color = triangle.fill.get_color(x, y)
-                    render_context.color_buffer.data[y * width + x] = color
+            # Preparation for uv interpolation
+            ty = (y - left.y) / y_diff
+            ty_ = 1.0 - ty
+            u_left = left.u * ty_ + bottom.u * ty
+            u_right = right.u * ty_ + bottom.u * ty
+            v_left = left.v * ty_ + bottom.v * ty
+            v_right = right.v * ty_ + bottom.v * ty
+            _rasterize_row(x_left, x_right, 
+                           y, 
+                           width, 
+                           u_left, v_left, 
+                           u_right, v_right, 
+                           fill, 
+                           data, 
+                           use_msaa, use_aaa,
+                           sample_num, level, pattern, alpha_increament)
+            
 
 def _rasterize_flat_bottom_triangle(renderer: Renderer,
                             t_left: float,
                             t_right: float,
-                               top: Vec2,
-                                 left: Vec2,
-                                 right: Vec2,
+                               top: Vertex2,
+                                 left: Vertex2,
+                                 right: Vertex2,
                                 triangle: Triangle,
                                 render_context: RenderContext,
                                 scene: Scene | None = None) -> None:
-    raise NotImplementedError
+    # Localize variables & AA
+    aa = renderer.anti_aliasing
+    use_ssaa = isinstance(aa, SSAA)
+    use_msaa = isinstance(aa, MSAA)
+    use_aaa = isinstance(aa, AAA)
+    if use_ssaa:
+        width = render_context.ss_buffer.width
+        height = render_context.ss_buffer.height
+        data = render_context.ss_buffer.data
+    else:
+        width = render_context.width
+        height = render_context.height
+        data = (render_context.ms_buffer.data if use_msaa 
+                else render_context.color_buffer.data)
+    pattern = level = sample_num = alpha_increament = None
+    if use_msaa or use_aaa:
+        pattern = tuple((dx, dy * t_left, dy * t_right) for dx, dy in aa.pattern)
+        level = aa._level
+        sample_num = 1 << level
+        alpha_increament = 1 / len(pattern)
+    fill = triangle.fill
+    # Preparation for uv interpolation
+    y_diff = left.y - top.y
+    # Rasterization
+    for y in range(round(top.y), round(left.y) + 1):
+        if 0 <= y < height:
+            # Calculate the x-coordinates of the left and right edges
+            x_left = top.x + (y - top.y) * t_left
+            x_right = top.x + (y - top.y) * t_right
+            # UV of the left and right edges
+            ty = (y - top.y) / y_diff
+            ty_ = 1.0 - ty
+            u_left = left.u * ty + top.u * ty_
+            u_right = right.u * ty + top.u * ty_
+            v_left = left.v * ty + top.v * ty_
+            v_right = right.v * ty + top.v * ty_
+            _rasterize_row(x_left, x_right, 
+                           y, 
+                           width, 
+                           u_left, v_left, 
+                           u_right, v_right, 
+                           fill, 
+                           data, 
+                           use_msaa, use_aaa,
+                           sample_num, level, pattern, alpha_increament)
 
 RASTERIZERS = {
     Node: rasterize_node,
