@@ -6,7 +6,7 @@ from ..stroke import Stroke
 from ...core import Vec2, Vertex2, AbsoFloat, Transform2D
 from ...colors import Colors
 from .dot import Dot
-from .line import SimpleLine
+from .lines import SimpleLine
 from .circle import Circle
 
 class ShapeFactory:

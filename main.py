@@ -46,7 +46,7 @@ default()
 
 current_color = ICE
 pos = Vec2i(WIDTH // 2, HEIGHT // 2)
-line = deque([copy(pos), copy(pos)], maxlen=2)
+lines = deque([copy(pos), copy(pos)], maxlen=2)
 triangle = deque([copy(pos), copy(pos), copy(pos)], maxlen=3)
 recording = None
 clear()
@@ -102,10 +102,10 @@ with Keyboard() as keyboard:
 
             # Geomerties
             elif key.match("l"):
-                line.append(copy(pos))
+                lines.append(copy(pos))
                 base.set_color(pos.x, pos.y, Color(1, 0, 0, 1))
             elif key.match("L"):
-                base.draw_line(line[0], line[1], Color(0,0,0,1))
+                base.draw_line(lines[0], lines[1], Color(0,0,0,1))
             elif key.match("t"):
                 triangle.append(copy(pos))
                 base.set_color(pos.x, pos.y, Color(1, 0, 0, 1))
