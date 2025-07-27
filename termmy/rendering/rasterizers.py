@@ -154,8 +154,8 @@ def rasterize_simple_line(renderer: Renderer,
             if 0 <= dis_x < width and 0 <= dis_y < height:
                 interpolation_pos = i * iter_num_inv
                 fill_color = fill.get_color(
-                    round(interpolation_pos * u_diff + start_u),
-                    round(interpolation_pos * v_diff + start_v),
+                    interpolation_pos * u_diff + start_u,
+                    interpolation_pos * v_diff + start_v,
                 )
                 if use_msaa:
                     for j, sampled in enumerate(samples):
