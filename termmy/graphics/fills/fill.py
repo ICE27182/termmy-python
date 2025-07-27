@@ -7,10 +7,8 @@ from ...core import AbsoFloat
 
 class Fill(ABC):
     @abstractmethod
-    def get_color(self, x: AbsoFloat, y: AbsoFloat) -> Color:
+    def get_color(self, u: AbsoFloat, v: AbsoFloat) -> Color:
         """
         Get a new color object at the given coordinates.
-
-        x and y are relative to the shape's origin.
         """
 
