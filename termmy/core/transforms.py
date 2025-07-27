@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from .vec2 import Vec2
+from .vertices import Vertex2
 from .matrix2x2 import Mat2
 
 from dataclasses import dataclass, field
 from enum import IntFlag
+from typing import overload
+from copy import copy
 
 
 class TransformInheritance(IntFlag):
@@ -41,29 +44,49 @@ class Transform2D:
             current = current._parent
         return False
 
-    def apply(self, vec: Vec2) -> Vec2:
+    @overload
+    def apply(self, vertex: Vertex2) -> Vertex2:
         """Apply this transform and all its parent transforms to the provided
-        vector. The `vec` passed in will not be mutated.
+        vector. The `vertex` passed in will not be mutated. Its uv coordinates
+        will remain the same.
         
         Returns:
-            Vec2: A new Vec2 object.
+            Vertex2: A new `Vertex2` object.
         """
+    @overload
+    def apply(self, vec2: Vec2) -> Vec2:
+        """Apply this transform and all its parent transforms to the provided
+        vector. The `vec2` passed in will not be mutated.
+        
+        Returns:
+            Vec2: A new `Vec2` object.
+        """
+    def apply(self, v: Vec2 | Vertex2) -> Vec2 | Vertex2:
         current = self
         inherit = TransformInheritance.ALL
-        new_vec = Vec2(vec.x, vec.y)
+        new_v = copy(v)
         while current is not None:
-            new_vec -= current.pivot
+            new_v -= current.pivot
             if inherit & TransformInheritance.SCALE:
-                new_vec *= current.scale
+                new_v *= current.scale
             if inherit & TransformInheritance.ROTATE:
-                new_vec = current._rot_mat * new_vec
-            new_vec += current.pivot
+                new_v = current._rot_mat * new_v
+            new_v += current.pivot
             if inherit & TransformInheritance.TRANSLATE:
-                new_vec += current.translate
+                new_v += current.translate
             inherit = current.inheritance
             current = current._parent
-        return new_vec
+        return new_v
     
+    @overload
+    def unapply(self, vertex: Vertex2) -> Vertex2:
+        """Unapply this transform and all its parent transforms to the provided
+        vertex. The `vertex` passed in will not be mutated.
+
+        Returns:
+            Vertex2: A new Vertex2 object.
+        """
+    @overload
     def unapply(self, vec: Vec2) -> Vec2:
         """Unapply this transform and all its parent transforms to the provided
         vector. The `vec` passed in will not be mutated.
@@ -71,26 +94,27 @@ class Transform2D:
         Returns:
             Vec2: A new Vec2 object.
         """
+    def unapply(self, value: Vertex2 | Vec2) -> Vertex2 | Vec2:
         parents_and_self: list[Transform2D] = []
         inherits: list[TransformInheritance] = [TransformInheritance.ALL]
         current = self
-        new_vec = Vec2(vec.x, vec.y)
+        new_value = copy(value)
         while current is not None:
             parents_and_self.append(current)
             inherits.append(current.inheritance)
             current = current._parent
         inherits.pop()
         for parent, inherit in zip(reversed(parents_and_self), reversed(inherits)):
-            new_vec -= parent.pivot
+            new_value -= parent.pivot
             if inherit & TransformInheritance.TRANSLATE:
-                new_vec -= parent.translate
+                new_value -= parent.translate
             if inherit & TransformInheritance.ROTATE:
                 # The transpose is the same as the inverse for rotation matrices
-                new_vec = parent._rot_mat.get_transposed() * new_vec
+                new_value = parent._rot_mat.get_transposed() * new_value
             if inherit & TransformInheritance.SCALE:
-                new_vec *= 1.0 / parent.scale
-            new_vec += parent.pivot
-        return new_vec
+                new_value *= 1.0 / parent.scale
+            new_value += parent.pivot
+        return new_value
 
     def get_scale_factor(self) -> float:
         current = self

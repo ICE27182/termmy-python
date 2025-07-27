@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .vec2 import Vec2, Vec2i, Vec2Rela
+from .vertices import Vertex2
 from .matrix import Matrix
 
 from collections.abc import Iterable
@@ -134,6 +135,8 @@ class Mat2(Matrix):
     @overload
     def __mul__(self, other: Vec2) -> Vec2: ...
     @overload
+    def __mul__(self, other: Vertex2) -> Vertex2: ...
+    @overload
     def __mul__(self, other: Number) -> Mat2: ...
     @overload
     def __mul__(self, other: Iterable[Number]) -> tuple[Number]: ...
@@ -149,6 +152,10 @@ class Mat2(Matrix):
         elif isinstance(other, Vec2):
             return Vec2(self.a11 * other.x + self.a12 * other.y,
                         self.a21 * other.x + self.a22 * other.y)
+        elif isinstance(other, Vertex2):
+            return Vertex2(self.a11 * other.x + self.a12 * other.y,
+                           self.a21 * other.x + self.a22 * other.y,
+                           other.u, other.v)
         elif isinstance(other, Number):
             return Mat2((self.a11 * other, self.a12 * other,
                          self.a21 * other, self.a22 * other))
@@ -214,6 +221,14 @@ class Mat2(Matrix):
         return Vec2(
             self.a11 * vec.x + self.a12 * vec.y,
             self.a21 * vec.x + self.a22 * vec.y,
+        )
+    
+    def mul_vertex2(self, vertex2: Vertex2) -> Vertex2:
+        return Vertex2(
+            self.a11 * vertex2.x + self.a12 * vertex2.y,
+            self.a21 * vertex2.x + self.a22 * vertex2.y,
+            vertex2.u, 
+            vertex2.v
         )
 
     @override

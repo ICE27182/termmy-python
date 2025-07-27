@@ -47,6 +47,8 @@ class Color:
         )
     
     def blend_over(self, over: Self)  -> Self:
+        """Blend the new color to itself
+        """
         a = over.a
         a_ = 1.0 - a
         self.r = self.r*a_ + over.r*a

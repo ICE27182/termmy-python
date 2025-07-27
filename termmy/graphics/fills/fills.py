@@ -69,11 +69,9 @@ class LinearFill(Fill):
         """
         stops = self._stops
         if u <= 0.0:
-            return Color(0.8, 1.0, 0.0)
             color = stops[0][1]
             return Color(color.r, color.g, color.b, color.a)
         if u >= 1.0:
-            return Color(0.8, 0.0, 1.0)
             color = stops[-1][1]
             return Color(color.r, color.g, color.b, color.a)
         # Perform linear interpolation between the color stops

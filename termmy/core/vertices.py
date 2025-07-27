@@ -29,20 +29,20 @@ class Vertex2:
     u: NormFloat
     v: NormFloat
 
-    def __add__(self, other) -> Vec2:
-        return Vec2(self.x + other.x, self.y + other.y)
-    def __iadd__(self, other) -> Self:
+    def __add__(self, other: Vec2 | Vertex2) -> Vertex2:
+        return Vertex2(self.x + other.x, self.y + other.y, self.u, self.v)
+    def __iadd__(self, other: Vec2 | Vertex2) -> Self:
         self.x += other.x
         self.y += other.y
         return self
-    def __sub__(self, other) -> Vec2:
-        return Vec2(self.x - other.x, self.y - other.y)
-    def __isub__(self, other) -> Self:
+    def __sub__(self, other: Vec2 | Vertex2) -> Vertex2:
+        return Vertex2(self.x - other.x, self.y - other.y, self.u, self.v)
+    def __isub__(self, other: Vec2 | Vertex2) -> Self:
         self.x -= other.x
         self.y -= other.y
         return self
-    def __mul__(self, scalar) -> Vec2:
-        return Vec2(self.x * scalar, self.y * scalar)
+    def __mul__(self, scalar: float) -> Vertex2:
+        return Vertex2(self.x * scalar, self.y * scalar, self.u, self.v)
     def __imul__(self, scalar) -> Self:
         self.x *= scalar
         self.y *= scalar
