@@ -60,7 +60,7 @@ class Matrix:
             return self.mul_num(other)
         else:
             raise ValueError("Unsupported operand type(s) "
-                             f"for *: {type(other)}")
+                             f"for: {type(other)}")
     
 
     def get_transposed(self) -> Matrix:

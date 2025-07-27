@@ -72,13 +72,15 @@ class Transform2D:
             Vec2: A new Vec2 object.
         """
         parents_and_self: list[Transform2D] = []
+        inherits: list[TransformInheritance] = [TransformInheritance.ALL]
         current = self
         new_vec = Vec2(vec.x, vec.y)
         while current is not None:
             parents_and_self.append(current)
+            inherits.append(current.inheritance)
             current = current._parent
-        for parent in reversed(parents_and_self):
-            inherit = parent.inheritance
+        inherits.pop()
+        for parent, inherit in zip(reversed(parents_and_self), reversed(inherits)):
             new_vec -= parent.pivot
             if inherit & TransformInheritance.TRANSLATE:
                 new_vec -= parent.translate

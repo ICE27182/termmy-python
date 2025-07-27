@@ -172,7 +172,7 @@ class ShapeFactory:
             z=z,
             transform=Transform2D(
                 translate=Vec2(x, y),
-                pivot=Vec2(x, y),
+                pivot=Vec2(0, 0),
                 # No circular ref here because it's a new object
                 _parent= None if parent_node is None else parent_node.transform,
             ),

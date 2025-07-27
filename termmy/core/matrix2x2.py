@@ -222,20 +222,26 @@ class Mat2(Matrix):
     
     @override
     def get_adjugate(self) -> Mat2:
-        return Mat2((self.a22, -self.a21,
-                     -self.a12, self.a11))
+        return Mat2((self.a22, -self.a12,
+                     -self.a21, self.a11))
     
     @override
     def get_inverse(self) -> Mat2:
         """Get the inverse of this 2 dimensional matrix.
         """
         det = self.get_determinant()
-        if det == 0:
-            raise ValueError("The matrix is singular (determinant is 0) and does not have an inverse.")
-        coef = 1 / det
+        if det == 0.0:
+            raise ValueError("The matrix is singular (determinant is 0) "
+                             "and does not have an inverse.")
+        coef = 1.0 / det
         adjugate = self.get_adjugate()
         return Mat2((
             adjugate.a11 * coef, adjugate.a12 * coef,
             adjugate.a21 * coef, adjugate.a22 * coef,
         ))
+    
+    @override
+    def get_transposed(self) -> Mat2:
+        return Mat2((self.a11, self.a21, 
+                     self.a12, self.a22))
     

@@ -202,7 +202,10 @@ def rasterize_circle(renderer: Renderer,
         pattern = aa.pattern
         sample_num = 1 << level
     scalar = render_context._abso_coord_scalar
+    scalar_inv = 1 / scalar
+    half_local_radius = 0.5 / circle.radius
     transform = circle.transform
+    fill = circle.fill
     # Transformation to screen coordinates
     vec = transform.apply(_VEC2_0_0)
     screen_x = vec.x * scalar
@@ -210,27 +213,20 @@ def rasterize_circle(renderer: Renderer,
     radius = circle.radius * circle.transform.get_scale_factor()
     screen_radius = radius * scalar
     screen_radius_squared = screen_radius * screen_radius
-    # Local coordinates interpolation for fill
-    # Let the uv of the center of a circle be (0.5, 0.5)
-    # Unlike triangles or lines, circles do not have vertices
-    # that undergo transformations
-    increament = 0.5 * circle.radius / screen_radius
-    uv_increaments = transform.apply_rotation(Vec2(increament, increament))
-    u_increament = uv_increaments.x
-    v_increament = uv_increaments.y
-    fill = circle.fill
     # Rasterization
-    abso_v = 0.0
     y_first_row = round(screen_y - screen_radius)
     row_starting = y_first_row * width
     for y in range(y_first_row, 
                    round(screen_y + screen_radius) + 1):
         if 0 <= y < height:
-            abso_u = 0.0
             for x in range(round(screen_x - screen_radius), 
                            round(screen_x + screen_radius) + 1):
                 if 0 <= x < width:
-                    fill_color = fill.get_color(abso_u, abso_v)
+                    local = transform.unapply(Vec2(x * scalar_inv, y * scalar_inv))
+                    fill_color = fill.get_color(local.x * half_local_radius + 0.5,
+                                                local.y * half_local_radius + 0.5)
+
+                    # fill_color = fill.get_color(abso_u, abso_v)
                     diff_x = x - screen_x
                     diff_y = y - screen_y
                     if use_msaa:
@@ -265,8 +261,6 @@ def rasterize_circle(renderer: Renderer,
                             old_color.g = fill_color.g
                             old_color.b = fill_color.b
                             old_color.a = fill_color.a
-                    abso_u += u_increament
-        abso_v += v_increament
         row_starting += width
 
 
