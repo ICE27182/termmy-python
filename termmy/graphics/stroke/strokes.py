@@ -41,11 +41,11 @@ class SimpleStroke(Stroke):
         fill = self.fill
         if type(shape) == Triangle:
             return (
-                SimpleLine(start=self.shape.a, end=self.shape.b, 
+                SimpleLine(start=self.shape.a, end=self.shape.b,
                            fill=fill, transform=shape.transform),
-                SimpleLine(start=self.shape.b, end=self.shape.c, 
+                SimpleLine(start=self.shape.b, end=self.shape.c,
                            fill=fill, transform=shape.transform),
-                SimpleLine(start=self.shape.a, end=self.shape.c, 
+                SimpleLine(start=self.shape.a, end=self.shape.c,
                            fill=fill, transform=shape.transform),
             )
         elif type(shape) == Rectangle:
@@ -60,7 +60,9 @@ class SimpleStroke(Stroke):
                 SimpleLine(start=a, end=d, fill=fill, transform=shape.transform),
             )
         elif type(shape) == Line:
-            raise NotImplementedError
+            return (SimpleStroke
+                        .from_simple_stroke(self, shape.rectangulate())
+                        .get_stroke())
         elif type(Shape) == Circle:
             raise NotImplementedError
         else:
