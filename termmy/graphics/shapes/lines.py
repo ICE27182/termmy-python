@@ -1,12 +1,14 @@
 
 
 from .shape import Shape
+from .rectangle import Rectangle
 from ..fills import Fill
 from ..stroke import Stroke
-from ...core import AbsoFloat, Vertex2
+from ...core import AbsoFloat, Vertex2, Transform2D
 
 from dataclasses import dataclass
 from math import atan2
+from copy import copy
 
 @dataclass(slots=True)
 class SimpleLine(Shape):
@@ -46,3 +48,21 @@ class SimpleLine(Shape):
 class Line(SimpleLine):
     stroke: Stroke | None = None
     weight: AbsoFloat = 2.0
+
+    def rectangulate(self) -> Rectangle:
+        lt = self.transform
+        # A manual deepcopy
+        transform = Transform2D(copy(lt.translate), copy(lt.pivot), 
+                                lt.inheritance, lt.scale, 
+                                lt._rotation_radians, copy(lt._rot_mat), 
+                                # A reference to the same parent
+                                lt._parent)
+        transform.rotation_radians += self.inclinantion()
+        transform.translate += self.start
+        rectangle = Rectangle(self.length(), 
+                              self.weight, 
+                              self.fill,
+                              self.stroke,
+                              z=self.z,
+                              transform=transform)
+        return rectangle

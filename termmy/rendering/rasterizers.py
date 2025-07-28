@@ -331,22 +331,7 @@ def rasterize_line(renderer: Renderer,
                    line: Line,
                    render_context: RenderContext,
                    scene: Scene | None = None) -> None:
-    lt = line.transform
-    # A manual deepcopy
-    transform = Transform2D(copy(lt.translate), copy(lt.pivot), 
-                            lt.inheritance, lt.scale, 
-                            lt._rotation_radians, copy(lt._rot_mat), 
-                            # A reference to the same parent
-                            lt._parent)
-    transform.rotation_radians += line.inclinantion()
-    transform.translate += line.start
-    rectangle = Rectangle(line.length(), 
-                          line.weight * render_context._abso_coord_scalar, 
-                          line.fill,
-                          line.stroke,
-                          z=line.z,
-                          transform=transform)
-    rasterize_rectangle(renderer, rectangle, render_context, scene)
+    rasterize_rectangle(renderer, line.rectangulate(), render_context, scene)
 
 def _rasterize_row(
                    x_left: float,
