@@ -6,7 +6,7 @@ from .render_context import RenderContext
 from .anti_aliasing import MSAA, AAA, SSAA
 from ..core import Transform2D, Vec2, Vertex2
 from ..colors import Color
-from ..graphics import Scene, Node, Fill
+from ..graphics import Scene, Node, Fill, Stroke
 from ..graphics import Dot, SimpleLine, Circle, Ring
 from ..graphics import Triangle, Rectangle, Line
 
@@ -261,6 +261,7 @@ def rasterize_circle(renderer: Renderer,
                             old_color.b = fill_color.b
                             old_color.a = fill_color.a
         row_starting += width
+    _rasterize_stroke(renderer, circle.stroke, render_context, scene)
 
 def rasterize_ring(renderer: Renderer,
                     ring: Ring,
@@ -352,6 +353,7 @@ def rasterize_ring(renderer: Renderer,
                             old_color.b = fill_color.b
                             old_color.a = fill_color.a
         row_starting += width
+    _rasterize_stroke(renderer, ring.stroke, render_context, scene)
 
 def rasterize_triangle(renderer: Renderer,
                        triangle: Triangle,
@@ -406,6 +408,7 @@ def rasterize_triangle(renderer: Renderer,
             _rasterize_flat_bottom_triangle(renderer, t_ab, t_ac, a, b, mid, triangle, render_context, scene)
             _rasterize_flat_top_triangle(renderer, t_bc, t_ac, b, mid, c, triangle, render_context, scene)
 
+    _rasterize_stroke(renderer, triangle.stroke, render_context, scene)
 
 def rasterize_rectangle(renderer: Renderer,
                         rectangle: Rectangle,
@@ -413,12 +416,14 @@ def rasterize_rectangle(renderer: Renderer,
                         scene: Scene | None = None) -> None:
     for triangle in rectangle.triangulate():
         rasterize_triangle(renderer, triangle, render_context, scene)
+    _rasterize_stroke(renderer, rectangle.stroke, render_context, scene)
 
 def rasterize_line(renderer: Renderer,
                    line: Line,
                    render_context: RenderContext,
                    scene: Scene | None = None) -> None:
     rasterize_rectangle(renderer, line.rectangulate(), render_context, scene)
+    _rasterize_stroke(renderer, line.stroke, render_context, scene)
 
 def _rasterize_row(
                    x_left: float,
@@ -636,6 +641,14 @@ def _rasterize_flat_bottom_triangle(renderer: Renderer,
                            data, 
                            use_msaa, use_aaa,
                            sample_num, level, pattern, alpha_increament)
+
+def _rasterize_stroke(renderer: Renderer,
+                      stroke: Stroke | None,
+                      render_context: RenderContext,
+                      scene: Scene | None = None) -> None:
+    if stroke:
+        for shape in stroke.get_stroke():
+            renderer._render_node(shape, render_context, scene)
 
 RASTERIZERS = {
     Node: rasterize_node,

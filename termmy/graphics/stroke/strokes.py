@@ -28,7 +28,9 @@ class SimpleStroke(Stroke):
         simple_stroke: SimpleStroke, 
         shape: ShapeSupportedBySimpleStroke
     ) -> SimpleStroke:
-        if isinstance(shape, ShapeSupportedBySimpleStroke):
+        from ..shapes import Triangle, Circle, Ring, Line, Rectangle
+
+        if isinstance(shape, (Circle, Ring, Line, Rectangle, Triangle)):
             return cls(simple_stroke.fill, shape)
         else:
             raise ValueError("`shape` must be an instance of "
@@ -40,6 +42,8 @@ class SimpleStroke(Stroke):
     def get_stroke(self) -> tuple[Shape]:
         """Get a tuple of shapes that outlines the 
         """
+        from ..shapes import Shape, SimpleLine, Triangle
+        from ..shapes import Circle, Ring, Line, Rectangle
         shape = self.shape
         fill = self.fill
         if type(shape) == Triangle:
@@ -66,10 +70,18 @@ class SimpleStroke(Stroke):
             return (SimpleStroke
                         .from_simple_stroke(self, shape.rectangulate())
                         .get_stroke())
-        elif type(Shape) == Circle:
-            raise NotImplementedError
-        elif type(Shape) == Ring:
-            raise NotImplementedError
+        elif type(shape) == Circle:
+            return (
+                Ring(shape.radius, shape.radius + 1.0,
+                     self.fill, transform=shape.transform),
+            )
+        elif type(shape) == Ring:
+            return (
+                Ring(shape.inner_radius, shape.inner_radius - 1.0,
+                     self.fill, transform=shape.transform),
+                Ring(shape.outer_radius, shape.outer_radius + 1.0,
+                     self.fill, transform=shape.transform),
+            )
         else:
             # This may occur when the user manually set `shape` to a shape
             # that is not supported
