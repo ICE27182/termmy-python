@@ -345,6 +345,42 @@ class AnimatedImage(Image):
     
     ...
 
+class Allocator(ABC):
+    __slots__ = ("allocated", "index")
+    def __init__(self, size: int = 1024) -> None:
+        self.allocated = [None] * size
+        self.index = 0
+
+    def allocate(self, *args, **kwargs) -> Any:
+        if self.index >= len(self.allocated):
+            returned_object = None
+            self.allocated.append(returned_object)
+        else:
+            returned_object = self.allocated[self.index]
+        self.index += 1
+        return returned_object
+    
+    def deallocate_all(self) -> None:
+        self.index = 0
+
+class ColorAllocator(Allocator):
+    allocated: list[Color]
+    def __init__(self, size: int = 1024) -> None:
+        self.allocated = [Color() for _ in range(size)]
+        self.index = 0
+    def allocate(self, r: float, g: float, b: float, a: float, *args, **kwargs) -> Color:
+        if self.index >= len(self.allocated):
+            returned_object = Color(r, g, b, a)
+            self.allocated.append(returned_object)
+        else:
+            returned_object = self.allocated[self.index]
+            returned_object.r = r
+            returned_object.g = g
+            returned_object.b = b
+            returned_object.a = a
+        self.index += 1
+        return returned_object
+
 
 
 if __name__ == "__main__":

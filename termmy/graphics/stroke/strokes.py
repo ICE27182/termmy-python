@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from typing import override, overload, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..shapes import Shape, SimpleLine, Triangle
-    from ..shapes import Circle, Ring, Line, Rectangle
+    from ..shapes import Shape, SimpleLine, SimpleRing
+    from ..shapes import Triangle, Circle, Ring, Line, Rectangle
 
 type ShapeSupportedBySimpleStroke = Circle | Ring | Line | Rectangle | Triangle
 
@@ -40,6 +40,8 @@ class SimpleStroke(Stroke):
     def get_stroke(self) -> tuple[Shape]:
         """Get a tuple of shapes that outlines the 
         """
+        from ..shapes import Shape, SimpleLine, SimpleRing
+        from ..shapes import Triangle, Circle, Ring, Line, Rectangle
         shape = self.shape
         fill = self.fill
         if type(shape) == Triangle:
@@ -66,9 +68,11 @@ class SimpleStroke(Stroke):
             return (SimpleStroke
                         .from_simple_stroke(self, shape.rectangulate())
                         .get_stroke())
-        elif type(Shape) == Circle:
-            raise NotImplementedError
-        elif type(Shape) == Ring:
+        elif type(shape) == Circle:
+            return (
+                SimpleRing(shape.radius, self.fill, transform=shape.transform),
+            )
+        elif type(shape) == Ring:
             raise NotImplementedError
         else:
             # This may occur when the user manually set `shape` to a shape
