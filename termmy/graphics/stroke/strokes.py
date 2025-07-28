@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from .stroke import Stroke
 from ..fills import Fill
-from ..shapes import Shape, SimpleLine, Triangle, Circle, Line, Rectangle
 from ...core import AbsoFloat, Vertex2
 
 from dataclasses import dataclass
-from typing import override, overload
+from typing import override, overload, TYPE_CHECKING
 
-type ShapeSupportedBySimpleStroke = Circle | Line | Rectangle | Triangle
+if TYPE_CHECKING:
+    from ..shapes import Shape, SimpleLine, Triangle
+    from ..shapes import Circle, Ring, Line, Rectangle
+
+type ShapeSupportedBySimpleStroke = Circle | Ring | Line | Rectangle | Triangle
 
 @dataclass(slots=True)
 class SimpleStroke(Stroke):
@@ -64,6 +67,8 @@ class SimpleStroke(Stroke):
                         .from_simple_stroke(self, shape.rectangulate())
                         .get_stroke())
         elif type(Shape) == Circle:
+            raise NotImplementedError
+        elif type(Shape) == Ring:
             raise NotImplementedError
         else:
             # This may occur when the user manually set `shape` to a shape

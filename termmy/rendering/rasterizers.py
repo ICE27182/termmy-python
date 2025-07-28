@@ -7,7 +7,7 @@ from .anti_aliasing import MSAA, AAA, SSAA
 from ..core import Transform2D, Vec2, Vertex2
 from ..colors import Color
 from ..graphics import Scene, Node, Fill
-from ..graphics import Dot, SimpleLine, Circle
+from ..graphics import Dot, SimpleLine, Circle, Ring
 from ..graphics import Triangle, Rectangle, Line
 
 from typing import TYPE_CHECKING
@@ -226,8 +226,6 @@ def rasterize_circle(renderer: Renderer,
                     local = transform.unapply(Vec2(x * scalar_inv, y * scalar_inv))
                     fill_color = fill.get_color(local.x * half_local_radius + 0.5,
                                                 local.y * half_local_radius + 0.5)
-
-                    # fill_color = fill.get_color(abso_u, abso_v)
                     diff_x = x - screen_x
                     diff_y = y - screen_y
                     if use_msaa:
@@ -264,7 +262,96 @@ def rasterize_circle(renderer: Renderer,
                             old_color.a = fill_color.a
         row_starting += width
 
-
+def rasterize_ring(renderer: Renderer,
+                    ring: Ring,
+                    render_context: RenderContext,
+                    scene: Scene | None = None) -> None:
+    # Localize variables & AA
+    aa = renderer.anti_aliasing
+    use_aaa = isinstance(aa, AAA)
+    use_msaa = isinstance(aa, MSAA)
+    use_ssaa = isinstance(aa, SSAA)
+    if use_ssaa:
+        width = render_context.ss_buffer.width
+        height = render_context.ss_buffer.height
+        data = render_context.ss_buffer.data
+    else:
+        width = render_context.width
+        height = render_context.height
+        data = (render_context.ms_buffer.data if use_msaa
+                else render_context.color_buffer.data)
+    if use_aaa or use_msaa:
+        level = aa._level
+        pattern = aa.pattern
+        sample_num = 1 << level
+    scalar = render_context._abso_coord_scalar
+    scalar_inv = 1 / scalar
+    # Since it is half local radius is used for calculating the local 
+    # uv coordinates, only the outer radius needs to be considered as it
+    # determines where uv=(0.0, 0.0) and uv=(1.0, 1.0) locates
+    half_local_outer_radius = 0.5 / ring.outer_radius
+    transform = ring.transform
+    fill = ring.fill
+    # Transformation to screen coordinates
+    vec = transform.apply(_VEC2_0_0)
+    screen_x = vec.x * scalar
+    screen_y = vec.y * scalar
+    inner_radius = ring.inner_radius * ring.transform.get_scale_factor()
+    outer_radius = ring.outer_radius * ring.transform.get_scale_factor()
+    screen_inner_radius = inner_radius * scalar
+    screen_outer_radius = outer_radius * scalar
+    screen_inner_radius_squared = screen_inner_radius * screen_inner_radius
+    screen_outer_radius_squared = screen_outer_radius * screen_outer_radius
+    # Rasterization
+    y_first_row = round(screen_y - screen_outer_radius)
+    row_starting = y_first_row * width
+    for y in range(y_first_row, 
+                   round(screen_y + screen_outer_radius) + 1):
+        if 0 <= y < height:
+            for x in range(round(screen_x - screen_outer_radius), 
+                           round(screen_x + screen_outer_radius) + 1):
+                if 0 <= x < width:
+                    local = transform.unapply(Vec2(x * scalar_inv, y * scalar_inv))
+                    fill_color = fill.get_color(local.x * half_local_outer_radius + 0.5,
+                                                local.y * half_local_outer_radius + 0.5)
+                    diff_x = x - screen_x
+                    diff_y = y - screen_y
+                    if use_msaa:
+                        samples = (screen_inner_radius_squared <=
+                                   (diff_x+dx)*(diff_x+dx) 
+                                   + (diff_y+dy)*(diff_y+dy) 
+                                   <= screen_outer_radius_squared 
+                                   for dx, dy in pattern)
+                        for i, sampled in enumerate(samples, (row_starting + x) << level):
+                            if sampled:
+                                old_color = data[i]
+                                old_color.r = fill_color.r
+                                old_color.g = fill_color.g
+                                old_color.b = fill_color.b
+                                old_color.a = fill_color.a
+                    elif use_aaa:
+                        samples = (screen_inner_radius_squared <=
+                                   (diff_x+dx)*(diff_x+dx) 
+                                   + (diff_y+dy)*(diff_y+dy) 
+                                   <= screen_outer_radius_squared
+                                   for dx, dy in pattern)
+                        alpha = sum(samples) / sample_num
+                        alpha_ = 1.0 - alpha
+                        old_color = data[row_starting + x]
+                        old_color.r = alpha * fill_color.r + alpha_ * old_color.r
+                        old_color.g = alpha * fill_color.g + alpha_ * old_color.g
+                        old_color.b = alpha * fill_color.b + alpha_ * old_color.b
+                        old_color.a = fill_color.a
+                    else:
+                        if (screen_inner_radius_squared <= 
+                            diff_x*diff_x + diff_y*diff_y 
+                            <= screen_outer_radius_squared):
+                            old_color = data[row_starting + x]
+                            old_color.r = fill_color.r
+                            old_color.g = fill_color.g
+                            old_color.b = fill_color.b
+                            old_color.a = fill_color.a
+        row_starting += width
 
 def rasterize_triangle(renderer: Renderer,
                        triangle: Triangle,
@@ -555,6 +642,7 @@ RASTERIZERS = {
     Dot: rasterize_dot,
     SimpleLine: rasterize_simple_line,
     Circle: rasterize_circle,
+    Ring: rasterize_ring,
     Triangle: rasterize_triangle,
     Rectangle: rasterize_rectangle,
     Line: rasterize_line,

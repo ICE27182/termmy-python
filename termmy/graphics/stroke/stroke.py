@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from ..shapes import Shape
-from ...colors import Color
-from ...core import NormFloat
-
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..shapes import Shape
+
 
 class Stroke(ABC):
     @abstractmethod
