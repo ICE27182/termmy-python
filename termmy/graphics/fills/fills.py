@@ -1,13 +1,17 @@
 
 
+from __future__ import annotations
+
 from .fill import Fill
 from ...colors import Color
-from ...core import Vec2, NormFloat, UV
+from ...core import Vec2, NormFloat, UV, Transform2D
+from ...buffers import Buffer2D, ColorBuffer
 
 from typing import override
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from collections.abc import Iterable
 from bisect import bisect_left
+from copy import copy
 
 @dataclass(slots=True)
 class SolidFill(Fill):
@@ -21,6 +25,17 @@ class SolidFill(Fill):
 class LinearFill(Fill):
     # hidden for maintaing order
     _stops: list[tuple[NormFloat, Color]]
+
+    @classmethod
+    def from_colors(cls, color1: Color, color2: Color, *args) -> LinearFill:
+        """Returns a linear fill object with even stops. The colors will
+        be stored as references.
+        """
+        interval_num_inv = 1 / (1 + len(args))
+        stops = [(0.0, color1), (interval_num_inv, color2)]
+        stops.extend(((i * interval_num_inv, color) 
+                      for i, color in enumerate(args, 2)))
+        return cls(stops)
 
     @property
     def stops(self) -> tuple[tuple[NormFloat, Color]]:
@@ -61,7 +76,8 @@ class LinearFill(Fill):
             stops[length - 2] = (1.0, stops[length - 2][1])
             return stops.pop(index)[1]
 
-    def get_color(self, u, v) -> Color:
+    @override
+    def get_color(self, u: NormFloat, v: NormFloat) -> Color:
         """Only `u` will be taken into account.
         
         Returns:
@@ -91,3 +107,33 @@ class LinearFill(Fill):
             color_l.b * t_ + color_r.b * t,
             color_l.a * t_ + color_r.a * t,
         )
+
+@dataclass(slots=True)
+class SimpleColorBufferFill:
+    data: ColorBuffer
+    u_scale: float
+    v_scale: float
+
+    @classmethod
+    def from_color_buffer(buffer: ColorBuffer):
+        return SimpleColorBufferFill(
+            buffer=buffer.data,
+            u_scale=float(buffer.width),
+            v_scale=float(buffer.width * buffer.height),
+        )
+
+    @override
+    def get_color(self, u: NormFloat, v: NormFloat) -> Color:
+        return copy(self.data[round(u*self.u_scale) + round(v*self.v_scale)])
+
+@dataclass(slots=True)
+class BufferFill:
+    buffer: Buffer2D
+    transform: Transform2D = field(default_factory=Transform2D)
+    
+    @override
+    def get_color(self, u: NormFloat, v: NormFloat) -> Color:
+        buf = self.buffer
+        transformed = self.transform.apply(Vec2(u * buf.width, v * buf.height))
+        return self.buffer.get_color(int(transformed.x), int(transformed.y))
+

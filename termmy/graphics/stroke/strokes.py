@@ -72,14 +72,14 @@ class SimpleStroke(Stroke):
                         .get_stroke())
         elif type(shape) == Circle:
             return (
-                Ring(shape.radius, shape.radius + 1.0,
+                Ring(shape.radius, shape.radius * 1.1,
                      self.fill, transform=shape.transform),
             )
         elif type(shape) == Ring:
             return (
-                Ring(shape.inner_radius, shape.inner_radius - 1.0,
+                Ring(shape.inner_radius * 0.90, shape.inner_radius,
                      self.fill, transform=shape.transform),
-                Ring(shape.outer_radius, shape.outer_radius + 1.0,
+                Ring(shape.outer_radius, shape.outer_radius * 1.1,
                      self.fill, transform=shape.transform),
             )
         else:

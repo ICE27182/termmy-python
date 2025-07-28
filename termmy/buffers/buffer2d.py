@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from .text_tag import TextTag
 
 class Buffer2D(ABC):
-
     def __init__(self, width: int, height: int):
         if not isinstance(width, int):
             raise TypeError(f"`width` must be an int. Got {type(width)}.")
@@ -22,8 +21,8 @@ class Buffer2D(ABC):
             raise ValueError(f"`width` must be greater than 0. Got {width}.")
         if height <= 0:
             raise ValueError(f"`height` must be greater than 0. Got {height}.")
-        self.width:int
-        self.height:int
+        self.width = width
+        self.height = height
 
     def clear(self) -> Buffer2D:
         """
