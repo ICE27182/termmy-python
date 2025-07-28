@@ -1,11 +1,12 @@
 
 
-from dataclasses import dataclass
-
 from .shape import Shape
 from ..fills import Fill
 from ..stroke import Stroke
 from ...core import AbsoFloat, Vertex2
+
+from dataclasses import dataclass
+from math import atan2
 
 @dataclass(slots=True)
 class SimpleLine(Shape):
@@ -17,6 +18,13 @@ class SimpleLine(Shape):
     start: Vertex2 = None
     end: Vertex2 = None
     fill: Fill | None = None
+
+    def length(self) -> float:
+        return (self.end - self.start).length()
+    
+    def inclinantion(self) -> float:
+        """Returns the angle of inclination in radians"""
+        return atan2(self.end.y - self.start.y, self.end.x - self.start.x)
 
     def slope(self) -> float:
         return ((self.end.y - self.start.y) / (self.end.x - self.start.x) 
@@ -37,4 +45,4 @@ class SimpleLine(Shape):
 @dataclass(slots=True)
 class Line(SimpleLine):
     stroke: Stroke | None = None
-    weight: AbsoFloat = 0.02
+    weight: AbsoFloat = 2.0

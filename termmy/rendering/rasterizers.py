@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from .render_context import RenderContext
 from .anti_aliasing import MSAA, AAA, SSAA
-from ..core import NormFloat, Vec2, Vertex2
+from ..core import Transform2D, Vec2, Vertex2
 from ..colors import Color
 from ..graphics import Scene, Node, Fill
 from ..graphics import Dot, SimpleLine, Circle
@@ -13,6 +13,7 @@ from ..graphics import Triangle, Rectangle, Line
 from typing import TYPE_CHECKING
 from abc import ABC, abstractmethod
 from math import ceil, floor
+from copy import copy
 if TYPE_CHECKING:
     from .renderer import Renderer
 
@@ -323,13 +324,29 @@ def rasterize_rectangle(renderer: Renderer,
                         rectangle: Rectangle,
                         render_context: RenderContext,
                         scene: Scene | None = None) -> None:
-    raise NotImplementedError
+    for triangle in rectangle.triangulate():
+        rasterize_triangle(renderer, triangle, render_context, scene)
 
 def rasterize_line(renderer: Renderer,
                    line: Line,
                    render_context: RenderContext,
                    scene: Scene | None = None) -> None:
-    raise NotImplementedError
+    lt = line.transform
+    # A manual deepcopy
+    transform = Transform2D(copy(lt.translate), copy(lt.pivot), 
+                            lt.inheritance, lt.scale, 
+                            lt._rotation_radians, copy(lt._rot_mat), 
+                            # A reference to the same parent
+                            lt._parent)
+    transform.rotation_radians += line.inclinantion()
+    transform.translate += line.start
+    rectangle = Rectangle(line.length(), 
+                          line.weight * render_context._abso_coord_scalar, 
+                          line.fill,
+                          line.stroke,
+                          z=line.z,
+                          transform=transform)
+    rasterize_rectangle(renderer, rectangle, render_context, scene)
 
 def _rasterize_row(
                    x_left: float,
