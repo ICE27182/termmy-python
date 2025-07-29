@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from enum import IntFlag
 from typing import overload
 from copy import copy
+from math import pi
 
 
 class TransformInheritance(IntFlag):
@@ -29,6 +30,25 @@ class Transform2D:
     _rotation_radians: float = 0.0
     _rot_mat: Mat2 = field(default_factory=Mat2.get_identity_matrix)
     _parent: Transform2D | None = None
+
+    @classmethod
+    def create_in_degrees(
+        cls, 
+        translate: Vec2 = None, 
+        rotation_degrees: float = 0.0,
+        scale: float = 1.0,
+        pivot: Vec2 = None,
+        inheritance: TransformInheritance = TransformInheritance.ALL,
+        parent: Transform2D | None = None
+    ) -> Transform2D:
+        radians = rotation_degrees * 360.0 / pi
+        return cls(translate or Vec2(0.0, 0.0),
+                   pivot or Vec2(0.0, 0.0),
+                   inheritance,
+                   scale,
+                   radians,
+                   Mat2.rotation(radians),
+                   parent)
 
     def __post_init__(self) -> None:
         self._rot_mat = Mat2.rotation(self._rotation_radians)

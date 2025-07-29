@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from .fill import Fill
 from ...colors import Color
-from ...core import Vec2, NormFloat, UV, Transform2D
+from ...core import Vec2, NormFloat, Transform2D
 from ...buffers import Buffer2D, ColorBuffer
 
 from typing import override
@@ -109,31 +109,55 @@ class LinearFill(Fill):
         )
 
 @dataclass(slots=True)
-class SimpleColorBufferFill:
-    data: ColorBuffer
+class SimpleColorBufferFill(Fill):
+    data: tuple[Color]
     u_scale: float
     v_scale: float
+    width: int
 
     @classmethod
-    def from_color_buffer(buffer: ColorBuffer):
+    def from_color_buffer(cls, buffer: ColorBuffer):
         return SimpleColorBufferFill(
-            buffer=buffer.data,
-            u_scale=float(buffer.width),
-            v_scale=float(buffer.width * buffer.height),
+            data=buffer.data,
+            u_scale=float(buffer.width - 1),
+            v_scale=float(buffer.height - 1),
+            width=buffer.width,
         )
 
     @override
     def get_color(self, u: NormFloat, v: NormFloat) -> Color:
-        return copy(self.data[round(u*self.u_scale) + round(v*self.v_scale)])
+        # Use clamping to limit the range of uv, which can go 
+        # out-of-bound because of the rounding
+        u = 0.0 if u <= 0.0 else u if u < 1.0 else 1.0
+        v = 0.0 if v <= 0.0 else v if v < 1.0 else 1.0
+        return copy(self.data[int(u*self.u_scale) + int(v*self.v_scale) * self.width])
 
 @dataclass(slots=True)
-class BufferFill:
+class BufferFill(Fill):
+    """
+    Attributes:
+        buffer (Buffer2D): The buffer to fill with.
+        transform (Transform2D): The transform to apply to the buffer.
+            Defaults to Transform2D().
+            It bases on the pixel coordinates of the buffer instead of 
+            the uv coordinates. 
+            e.g. To zoom in 3 times and rotate at the center of the buffer 
+            by 90 degrees, the transform should be set to 
+            ```
+            Transform2D.create_in_degrees(rotation_degrees=30, 
+                                          pivot=Vec2(bmp.width/2, bmp.height/2),
+                                          scale=1/3)
+            ```
+    """
     buffer: Buffer2D
     transform: Transform2D = field(default_factory=Transform2D)
     
     @override
     def get_color(self, u: NormFloat, v: NormFloat) -> Color:
+        # Use clamping to limit the range of uv, which can go 
+        # out-of-bound because of the rounding
         buf = self.buffer
-        transformed = self.transform.apply(Vec2(u * buf.width, v * buf.height))
+        u = 0.0 if u <= 0.0 else u if u < 1.0 else 1.0
+        v = 0.0 if v <= 0.0 else v if v < 1.0 else 1.0
+        transformed = self.transform.apply(Vec2(u * (buf.width-1), v * (buf.height-1)))
         return self.buffer.get_color(int(transformed.x), int(transformed.y))
-

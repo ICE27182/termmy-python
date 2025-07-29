@@ -223,11 +223,13 @@ def rasterize_circle(renderer: Renderer,
             for x in range(round(screen_x - screen_radius), 
                            round(screen_x + screen_radius) + 1):
                 if 0 <= x < width:
+                    diff_x = x - screen_x
+                    diff_y = y - screen_y
+                    if diff_x*diff_x + diff_y*diff_y > screen_radius_squared:
+                        continue
                     local = transform.unapply(Vec2(x * scalar_inv, y * scalar_inv))
                     fill_color = fill.get_color(local.x * half_local_radius + 0.5,
                                                 local.y * half_local_radius + 0.5)
-                    diff_x = x - screen_x
-                    diff_y = y - screen_y
                     if use_msaa:
                         samples = ((diff_x+dx)*(diff_x+dx) 
                                    + (diff_y+dy)*(diff_y+dy) 
@@ -253,13 +255,11 @@ def rasterize_circle(renderer: Renderer,
                         old_color.b = alpha * fill_color.b + alpha_ * old_color.b
                         old_color.a = fill_color.a
                     else:
-                       
-                        if diff_x*diff_x + diff_y*diff_y <= screen_radius_squared:
-                            old_color = data[row_starting + x]
-                            old_color.r = fill_color.r
-                            old_color.g = fill_color.g
-                            old_color.b = fill_color.b
-                            old_color.a = fill_color.a
+                        old_color = data[row_starting + x]
+                        old_color.r = fill_color.r
+                        old_color.g = fill_color.g
+                        old_color.b = fill_color.b
+                        old_color.a = fill_color.a
         row_starting += width
     _rasterize_stroke(renderer, circle.stroke, render_context, scene)
 
@@ -312,11 +312,15 @@ def rasterize_ring(renderer: Renderer,
             for x in range(round(screen_x - screen_outer_radius), 
                            round(screen_x + screen_outer_radius) + 1):
                 if 0 <= x < width:
+                    diff_x = x - screen_x
+                    diff_y = y - screen_y
+                    if not (screen_inner_radius_squared <= 
+                            diff_x*diff_x + diff_y*diff_y 
+                            <= screen_outer_radius_squared):
+                        continue
                     local = transform.unapply(Vec2(x * scalar_inv, y * scalar_inv))
                     fill_color = fill.get_color(local.x * half_local_outer_radius + 0.5,
                                                 local.y * half_local_outer_radius + 0.5)
-                    diff_x = x - screen_x
-                    diff_y = y - screen_y
                     if use_msaa:
                         samples = (screen_inner_radius_squared <=
                                    (diff_x+dx)*(diff_x+dx) 
@@ -344,14 +348,11 @@ def rasterize_ring(renderer: Renderer,
                         old_color.b = alpha * fill_color.b + alpha_ * old_color.b
                         old_color.a = fill_color.a
                     else:
-                        if (screen_inner_radius_squared <= 
-                            diff_x*diff_x + diff_y*diff_y 
-                            <= screen_outer_radius_squared):
-                            old_color = data[row_starting + x]
-                            old_color.r = fill_color.r
-                            old_color.g = fill_color.g
-                            old_color.b = fill_color.b
-                            old_color.a = fill_color.a
+                        old_color = data[row_starting + x]
+                        old_color.r = fill_color.r
+                        old_color.g = fill_color.g
+                        old_color.b = fill_color.b
+                        old_color.a = fill_color.a
         row_starting += width
     _rasterize_stroke(renderer, ring.stroke, render_context, scene)
 
