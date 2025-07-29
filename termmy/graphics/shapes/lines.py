@@ -1,10 +1,16 @@
 
 
+from __future__ import annotations
+
 from .shape import Shape
+from .dot import Dot
 from .rectangle import Rectangle
-from ..fills import Fill
+from ..fills import Fill, SolidFill
 from ..stroke import Stroke
-from ...core import AbsoFloat, Vertex2, Transform2D
+from ..stroke import Stroke
+from ..node import Node
+from ...colors import Colors
+from ...core import AbsoFloat, Vertex2, Transform2D, Vec2
 
 from dataclasses import dataclass
 from math import atan2
@@ -20,6 +26,46 @@ class SimpleLine(Shape):
     start: Vertex2 = None
     end: Vertex2 = None
     fill: Fill | None = None
+
+    @staticmethod
+    def create_with(
+        start: Vertex2 | Dot, 
+        end: Vertex2 | Dot,
+        fill: Fill | None = None,
+        z: float = 0.0,
+        parent_node: Node | None = None
+    ) -> SimpleLine:
+        """Create a simple line from two points/dots.
+        
+        Args:
+            start (Vertex2 | Dot): The starting point of the line. 
+                Will be stored as a reference in the returned object.
+            end (Vertex2 | Dot): The ending point of the line.
+                Will be stored as a reference in the returned object.
+            fill (Fill | None): The fill of the line. 
+                Defaults to a gray solid fill if not provided.
+            z (float): The depth of the line.
+            parent_node (Node | None): The optional parent node of the line.
+        """
+        if isinstance(start, Dot):
+            start = start.transform.translate
+        if isinstance(end, Dot):
+            end = end.transform.translate
+        return SimpleLine(start=start,
+                          end=end,
+                          # instances of `Filler` are always True
+                          fill=fill or SolidFill(Colors.gray()),
+                          z=z,
+                          transform=Transform2D(
+                              pivot=Vec2(
+                                  (start.x + end.x) * 0.5,
+                                  (end.y + start.y) * 0.5,
+                              ),
+                              # No circular ref here because it's a new object
+                              _parent= None if parent_node is None else parent_node.transform,
+                          ),
+                          # No circular ref here because it's a new object
+                          _parent=parent_node)
 
     def length(self) -> float:
         return (self.end - self.start).length()

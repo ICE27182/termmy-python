@@ -5,4 +5,3 @@ from .circle import Circle
 from .ring import Ring
 from .triangle import Triangle
 from .rectangle import Rectangle
-from .shape_factory import ShapeFactory
