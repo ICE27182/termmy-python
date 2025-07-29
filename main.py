@@ -1,172 +1,219 @@
 from termmy import *
-from termmy.colors.color_quantizer import *
-from termmy.buffers.msaa_patterns import *
-from math import log10
-from time import sleep, time
-from random import random
-from collections import deque
-from copy import copy
-import sys
+from math import pi
+from time import sleep
 
-def clear():
-    from os import system
-    import sys
-    if sys.platform == "win32":
-        system("cls")
-    else:
-        system("clear")
+grid = ColorBuffer(40, 40)
+for y in range(grid.height):
+    for x in range(grid.width):
+        grid.set_color(x, y,
+                       Colors.magenta()
+                       if x // 8 % 2 != y // 8 % 2 else
+                       Colors.black())
+
+if __name__ == "__main__" and True:
+    base = ColorBuffer(1, 1).fill()
+    renderer = Renderer(
+        anti_aliasing=None,
+    )
+    post_effect = PostEffect()
+    post_effect.fxaa = 0
+    post_effect.invert = 0
+    context = RenderContext(104, 52)
+    scene = Scene(base)
+
+    bmp = Image.from_image_file("ignored_meal.bmp")
+    buffer_fill = SimpleColorBufferFill.from_color_buffer(bmp.buffer)
+    scene.base = bmp.buffer
+    buffer_fill = BufferFill(bmp, 
+                             Transform2D.create_in_degrees(rotation_degrees=30, 
+                                                           pivot=Vec2(bmp.width/2, bmp.height/2),
+                                                           scale=1/3))
+    # buffer_fill = SimpleColorBufferFill.from_color_buffer(grid)
+    scene.base = grid
+
+    circle = Circle.at(
+        x=15.0, 
+        y=30.0, 
+        radius=12.0, 
+        z=1.0, 
+        fill=LinearFill.from_colors(
+            Colors.red(),
+            Colors.green(),
+            Colors.blue(),
+            Colors.ice(),
+        )
+    )
+    circle.transform.inheritance = (
+        TransformInheritance.NONE
+        | TransformInheritance.TRANSLATE
+        | TransformInheritance.SCALE
+        | TransformInheritance.ROTATE
+    )
+    circle.stroke = SimpleStroke(SolidFill(Colors.ice()), circle)
+    
+    grid_dots = (
+        Node(transform=Transform2D(
+                pivot=Vec2(35.0, 25.0),
+            ))
+            .add_child(Dot.at(x=5.0, y=10.0, z=0.0, fill=SolidFill(Color(1.0, 0.0, 0.0))))
+            .add_child(Dot.at(x=10.0, y=10.0, z=2.0, fill=SolidFill(Color(0.5, 0.0, 0.0))))
+            .add_child(Dot.at(x=20.0, y=10.0, z=0.0, fill=SolidFill(Color(0.5, 0.5, 0.0))))
+            .add_child(Dot.at(x=40.0, y=10.0, z=2.0, fill=SolidFill(Color(0.0, 1.0, 0.0))))
+
+            .add_child(Dot.at(x=5.0, y=30.0, z=0.0, fill=SolidFill(Color(0.0, 0.5, 0.0))))
+            .add_child(Dot.at(x=10.0, y=30.0, z=2.0, fill=SolidFill(Color(0.0, 0.5, 0.5))))
+            .add_child(Dot.at(x=20.0, y=30.0, z=0.0, fill=SolidFill(Color(0.0, 0.0, 1.0))))
+            .add_child(Dot.at(x=40.0, y=30.0, z=2.0, fill=SolidFill(Color(1.0, 0.0, 1.0))))
+
+            .add_child(circle)
+    )
+    pivot_circle = Circle.at(x=-1.0, y=-1.0, radius=2.0, z=1.0, fill=SolidFill(Color(0.0, 0.0, 0.0)))
+    pivot_circle.transform.translate = grid_dots.transform.pivot
+    grid_dots.add_child(pivot_circle)
+    scene.add_node(grid_dots)
+
+    start = Vertex2(40.0, 25.0, 0.0, 0.0)
+    end = Vertex2(20.0, 25.0, 1.0, 1.0)
+    scene.add_node(
+        Node()
+            .add_child(Dot.create_with(start))
+            .add_child(Dot.create_with(end))
+            .add_child(Line.create_with(
+                start=start,
+                end=end,
+                fill=LinearFill.from_colors(Colors.indigo(),
+                                            Colors.ice(),
+                                            Colors.lapis_lazuli())
+            ))
+    )
+
+    tri = Triangle(
+        a=Vertex2(0.0, 0.0, 0.0, 0.0),
+        b=Vertex2(25.0, 12.0, 1.0, 0.0),
+        c=Vertex2(16.0, 16.0, 16/25, 0.0),
+        # fill=LinearFill.from_colors(Colors.red(),
+        #                                  Colors.green(),
+        #                                  Colors.blue()),
+
+        fill = SolidFill(Colors.indigo()),
+        transform=Transform2D(translate=Vec2(4.0, 4.0),
+                              pivot=Vec2(41 / 3, 15))
+    )
+    scene.add_node(tri)
+
+    line_start = Vertex2(0.0, 2.0, 0.0, 0.0)
+    line_end = Vertex2(50.0, 20.0, 1.0, 1.0)
+    line = Line(line_start, line_end, fill=LinearFill.from_colors(Colors.red(), Colors.ice(), Colors.blue()))
+    scene.add_node(line)
+
+    ring = Ring(12, 18, LinearFill.from_colors(Colors.ice(), Colors.navy()), 
+                transform=Transform2D(translate=Vec2(15, 30)))
+    scene.add_node(ring)
+    # scene._nodes.clear()
+    rectangle = Rectangle(20, 20, buffer_fill, transform=Transform2D(translate=Vec2(60.0, 20.0)))
+    scene.add_node(rectangle)
+
+    aa_selection = 0
+    aa_pool = [
+        None,
+        AAAx4,
+        AAAx16,
+        MSAAx4,
+        MSAAx16,
+        SSAAx2,
+    ]
+
+    shape_selection = 0
+    shape_pool = [
+        rectangle,
+        circle,
+        ring,
+        line,
+        tri,
+    ]
+    stroke_pool = [s.stroke for s in shape_pool]
+    fill_pool = [s.fill for s in shape_pool]
+    STROKE = SimpleStroke(fill=LinearFill.from_colors(Colors.red(), Colors.black()), shape=tri)
+    clear_screen()
+    with Keyboard() as kb:
+        while True:
+            renderer.initiate_buffer(scene, context)
+            renderer.render_nodes(scene, context)
+            post_effect.apply(context)
+            safe_print(context.color_buffer.ansi_24(), end="\033[F"*context.height)
+            # sleep(1/10)
+
+            grid_dots.transform.rotation_radians -= pi / 120
+
+            rotated = Mat2.rotation(pi / 72) * (end - start) + start
+            end.x = rotated.x
+            end.y = rotated.y
+
+            rectangle.fill.transform.rotation_radians -= pi / 120
 
 
-WIDTH = 80
-HEIGHT = 60
-ICE = Color.from_ints(156, 220, 255, 127)
+            shape_selected: Shape = shape_pool[shape_selection % len(shape_pool)]
 
-display_settings = DisplaySettings.auto_detecting(ensure_lookup_exsits=True)
-# display_settings.inverse = True
-base = ColorBuffer(WIDTH, HEIGHT)
-# base = ColorBuffer.from_display_settings(display_settings)
-# display_settings.multisampling = MSAAoff
-# display_settings.set_color_mode(ColorMode.ANSI256)
-# display_settings.resize_mode = ResizeMode.AsIs
+            key_event = kb.get_key_event()
+            if key_event:
+                key = key_event.key
+                if key.match("escape"):
+                    break
+                # AA
+                elif key.match(")"):
+                    aa_selection += 1
+                elif key.match("("):
+                    aa_selection -= 1
+                elif key.match("-"):
+                    aa_selection = 0
+                elif key.match("F"):
+                    post_effect.fxaa = not post_effect.fxaa
+                    
+                elif key.match("w"):
+                    shape_selected.transform.translate.y -= 1.0
+                elif key.match("s"):
+                    shape_selected.transform.translate.y += 1.0
+                elif key.match("a"):
+                    shape_selected.transform.translate.x -= 1.0
+                elif key.match("d"):
+                    shape_selected.transform.translate.x += 1.0
+                elif key.match('q'):
+                    shape_selected.transform.rotation_radians -= 1/72
+                elif key.match('e'):
+                    shape_selected.transform.rotation_radians += 1/72
+                elif key.match('f'):
+                    shape_selected.transform.scale += 0.1
+                elif key.match('v'):
+                    shape_selected.transform.scale -= 0.1
+                elif key.match('r'):
+                    shape_selected.transform.scale = 1.0
 
-print(display_settings)
 
-def default():
-    base.fill()
-    base.draw_line(Vec2i(30, 30), Vec2i(16, 5))
-    base.draw_line(Vec2i(10, 30), Vec2i(60, 5), 
-                        color=Color.from_ints(156, 220, 255),
-                        # msaa=MSAAoff,
-                        )
-    base.draw_rect(Vec2i(15, 15), Vec2i(27, 27), fillcolor=True)
-    base.set_color(61, 8, Color.from_ints(255, 0, 0))
-    base.draw_triangle(Vec2i(4, 4), Vec2i(20, 28), Vec2i(52, 15), 
-                            fillcolor=True)
-default()
+                elif key.match("/"):
+                    shape_selected.stroke = None
+                elif key.match(","):
+                    shape_selected.fill = fill_pool[shape_selection]
+                elif key.match("."):
+                    shape_selected.fill = buffer_fill
 
-current_color = ICE
-pos = Vec2i(WIDTH // 2, HEIGHT // 2)
-lines = deque([copy(pos), copy(pos)], maxlen=2)
-triangle = deque([copy(pos), copy(pos), copy(pos)], maxlen=3)
-recording = None
-clear()
-with Keyboard() as keyboard:
-    while True:
-        if keyboard.is_recording():
-            base.blend_color(4, 4, Color(r=1.0))
-        else:
-            base.blend_color(4, 4, Color(g=1.0))
 
-        # Controls
-        key_event = keyboard.get_key_event()
-        # TODO Remove me
-        # safe_print(f"\033[F\n\033[F\033[38;2;156;220;255m{str(key_event):200}")
-        if key_event:
-            key = key_event.key
-            if key.match("escape"):
-                safe_print("Exiting")
-                sleep(0.5)
-                break
-            # Canvas
-            elif key.match("F"):
-                base.fill()
-            elif key.match("f"):
-                base.fill(current_color)
-            elif key.match(" "):
-                default()
-                pos = Vec2i(WIDTH // 2, HEIGHT // 2)
+                elif key.match("["):
+                    shape_selected.stroke = stroke_pool[shape_selection]
+                    shape_selection = (shape_selection - 1) % len(shape_pool)
+                    shape_selected = shape_pool[shape_selection]
+                    shape_selected.stroke = SimpleStroke.from_simple_stroke(STROKE, shape_selected)
+                elif key.match("]"):
+                    shape_selected.stroke = stroke_pool[shape_selection]
+                    shape_selection = (shape_selection + 1) % len(shape_pool)
+                    shape_selected = shape_pool[shape_selection]
+                    shape_selected.stroke = SimpleStroke.from_simple_stroke(STROKE, shape_selected)
+                    
+                # Clear
+                elif key.match(" "):
+                    clear_screen()
+                # Mode
+                elif key.name.isnumeric():
+                    circle.transform.inheritance = int(key.name)
 
-            # Color
-            elif key.match("R"):
-                current_color = ICE
-            elif key.match("r"):
-                current_color = Color(random(), random(), random(), random())
+            renderer.anti_aliasing = aa_pool[aa_selection % len(aa_pool)]
             
-            # Movement
-            elif key.match("up") or key.match("w"):
-                base.set_color(pos.x, pos.y, current_color)
-                pos.y = (pos.y - 1) % HEIGHT
-                base.set_color(pos.x, pos.y, ICE)
-            elif key.match("down") or key.match("s"):
-                base.set_color(pos.x, pos.y, current_color)
-                pos.y = (pos.y + 1) % HEIGHT
-                base.set_color(pos.x, pos.y, ICE)
-            elif key.match("left") or key.match("a"):
-                base.set_color(pos.x, pos.y, current_color)
-                pos.x = (pos.x - 1) % WIDTH
-                base.set_color(pos.x, pos.y, ICE)
-            elif key.match("right") or key.match("d"):
-                base.set_color(pos.x, pos.y, current_color)
-                pos.x = (pos.x + 1) % WIDTH
-                base.set_color(pos.x, pos.y, ICE)
-
-            # Geomerties
-            elif key.match("l"):
-                lines.append(copy(pos))
-                base.set_color(pos.x, pos.y, Color(1, 0, 0, 1))
-            elif key.match("L"):
-                base.draw_line(lines[0], lines[1], Color(0,0,0,1))
-            elif key.match("t"):
-                triangle.append(copy(pos))
-                base.set_color(pos.x, pos.y, Color(1, 0, 0, 1))
-            elif key.match("T"):
-                base.draw_triangle(triangle[0], triangle[1], triangle[2], True)
-
-            # Commands
-            elif key.match("/"):
-                with safe_io():
-                    while True:
-                        command = input("/").strip()
-                        if command.startswith(("echo ", "print ")):
-                            content = " ".join(command.split()[1:])
-                            print(content)
-                        elif command.startswith(("exit", "quit", "Q")):
-                            break
-                        elif command.startswith("recording"):
-                            command = command.split()
-                            if command[-1] == "show":
-                                print(f"{recording}")
-                            elif command[-1] == "save":
-                                if not recording:
-                                    print(f"No recording to save")
-                                else:
-                                    with open("KeyboardRecording", "w") as f:
-                                        f.write(recording.to_json())
-                                        print("Saved recording to "
-                                              "`KeyboardRecording` file.")
-                            elif command[-1] == "load":
-                                with open("KeyboardRecording", "r") as f:
-                                    recording = KeyboardRecording.from_json_string(f.read())
-                                    print(f"Loaded recording from "
-                                          "`KeyboardRecording` file.")
-                            else:
-                                print(f"{recording}")
-                        elif command.startswith("clear"):
-                            clear()
-                        else:
-                            print(f"Unknown command `{command}`")
-            
-            # Recording
-            elif (sys.platform == "win32" and key.match("f7") 
-                  or key.match("7")):
-                if keyboard.is_recording():
-                    recording = keyboard.end_recording(1)
-                else:
-                    keyboard.start_recording()
-            elif (sys.platform == "win32" and key.match("f8") 
-                  or key.match("8")):
-                if recording:
-                    keyboard.replay(recording)
-            elif key.match("0"):
-                with safe_io():
-                    clear()
-                    print(f"{recording}")
-                    print("-"*base.width)
-                    print(f"{keyboard.key_event_buffer=}")
-                    getch()
-        
-        if 1:
-            display(base, display_settings, go_back_to_top=True)
-        else:
-            sleep(1.0/90.0)
-            safe_print(base.ansi_24(), end="\033[F"*(HEIGHT))
