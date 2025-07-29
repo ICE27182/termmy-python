@@ -10,6 +10,7 @@ from abc import ABC, abstractmethod
 
 if TYPE_CHECKING:
     from .text_tag import TextTag
+    from ..rendering import AAAoff, AAA
 
 class Buffer2D(ABC):
     def __init__(self, width: int, height: int):
@@ -157,11 +158,10 @@ class Buffer2D(ABC):
         str_buff.pop() # Remove the last newline character
         return "".join(str_buff)
     
-    @deprecated("Use `draw` instead.")
     def draw_line(
             self, a: Vec2i, b: Vec2i, 
             color: Color | None = None,
-            msaa: MSAAPattern = tuple()
+            aaa: AAA = AAAoff
         ) -> None:
         """
         Line color will be default to 
@@ -172,8 +172,9 @@ class Buffer2D(ABC):
         addColor will be used so it is less suitable for performance critical
         application.
         """
+        pattern: tuple[tuple[float, float]] = aaa.pattern if aaa else tuple()
         color = color or Color(0.5, 0.5, 0.5, 1.0)
-        msaa_weight = 1 / len(msaa) if msaa else None
+        aa_weight = 1 / len(pattern) if pattern else None
         width, height = self.width, self.height
         dx = a.x - b.x
         if dx == 0:
@@ -192,10 +193,10 @@ class Buffer2D(ABC):
                     y = round(k * x + bias)
                     if 0 <= y < height:
                         composed_color = Color.blended(self.get_color(x, y), color)
-                        alpha = 0.0 if msaa else 1.0
-                        for dx, dy in msaa:
+                        alpha = 0.0 if pattern else 1.0
+                        for dx, dy in pattern:
                             diff = abs(y + dy - k * (x + dx) - bias)
-                            alpha += msaa_weight * (1.0 - diff) if diff < 1.0 else 0.0
+                            alpha += aa_weight * (1.0 - diff) if diff < 1.0 else 0.0
                         composed_color.a = alpha
                         self.blend_color(x, y, composed_color)
                 return
@@ -212,14 +213,13 @@ class Buffer2D(ABC):
             x = round(t * y + bias)
             if 0 <= x < width:
                 composed_color = Color.blended(self.get_color(x, y), color)
-                alpha = 0.0 if msaa else 1.0
-                for dx, dy in msaa:
+                alpha = 0.0 if pattern else 1.0
+                for dx, dy in pattern:
                     diff = abs(x + dx - t*(y + dy) - bias)
-                    alpha += msaa_weight * (1.0 - diff) if diff < 1.0 else 0.0
+                    alpha += aa_weight * (1.0 - diff) if diff < 1.0 else 0.0
                 composed_color.a = alpha
                 self.blend_color(x, y, composed_color)
 
-    @deprecated("Use `draw` instead.")
     def draw_rect(self, a: Vec2i, b: Vec2i, 
                   fillcolor: Color | bool = False,
                   linecolor: Color | bool = True) -> None:
@@ -258,11 +258,10 @@ class Buffer2D(ABC):
                 for x in range(x_min + 1, x_max):
                     self.blend_color(x, y, fillcolor)
 
-    @deprecated("Use `draw` instead.")
     def draw_triangle(self, a: Vec2i, b: Vec2i, c: Vec2i, 
                       fillcolor: Color | bool = False,
                       linecolor: Color | bool = True,
-                      msaa: MSAAPattern = tuple()) -> None:
+                      aaa: AAA = tuple()) -> None:
         """
         Draw a triangle with the given color.
 
@@ -274,6 +273,7 @@ class Buffer2D(ABC):
         setColor will be used so it is less suitable for performance critical
         application.
         """
+        pattern = aaa.pattern if aaa else tuple()
         if fillcolor and isinstance(fillcolor, bool):
             fillcolor = Color(0.25, 0.75, 0.25, 0.5)
         if linecolor and isinstance(linecolor, bool):
@@ -283,33 +283,32 @@ class Buffer2D(ABC):
             a, b, c = sorted((a, b, c), key=lambda v: v.y)
             if b.y == c.y:
                 b, c = (b, c) if b.x < c.x else (c, b)
-                self._fill_triangle_flat(a, b, c, fillcolor, msaa)
+                self._fill_triangle_flat(a, b, c, fillcolor, pattern)
             elif a.y == b.y:
                 a, b = (a, b) if a.x < b.x else (b, a)
-                self._fill_triangle_flat(c, a, b, fillcolor, msaa)
+                self._fill_triangle_flat(c, a, b, fillcolor, pattern)
             else:
                 x = a.x - (a.y - b.y) * (a.x - c.x) // (a.y - c.y)
                 d = Vec2i(x, b.y)
                 if b.x < d.x:
                     self._fill_triangle_flat(a, b, d, fillcolor, 
-                                             tuple() if linecolor else msaa)
+                                             tuple() if linecolor else pattern)
                     self._fill_triangle_flat(c, b, d, fillcolor, 
-                                             tuple() if linecolor else msaa)
+                                             tuple() if linecolor else pattern)
                 else:
                     self._fill_triangle_flat(a, d, b, fillcolor, 
-                                             tuple() if linecolor else msaa)
+                                             tuple() if linecolor else pattern)
                     self._fill_triangle_flat(c, d, b, fillcolor, 
-                                             tuple() if linecolor else msaa)
+                                             tuple() if linecolor else pattern)
 
         if linecolor:
-            self.draw_line(a, b, linecolor, msaa)
-            self.draw_line(b, c, linecolor, msaa)
-            self.draw_line(c, a, linecolor, msaa)
+            self.draw_line(a, b, linecolor, pattern)
+            self.draw_line(b, c, linecolor, pattern)
+            self.draw_line(c, a, linecolor, pattern)
     
-    @deprecated("Use `draw` instead.")
     def _fill_triangle_flat(self, a: Vec2i, b: Vec2i,
                             c: Vec2i, fillcolor: Color,
-                            msaa: MSAAPattern) -> None:
+                            pattern: tuple[tuple[float, float]]) -> None:
         """
         Fill a triangle with a flat top or bottom with `fillcolor`.
 
@@ -317,7 +316,7 @@ class Buffer2D(ABC):
         less than or equal to `c.x`. 
         """
         width, height = self.width, self.height
-        msaa_weight = 1 / len(msaa) if msaa else None
+        aa_weight = 1 / len(pattern) if pattern else None
         if a.y < b.y:
             y_min = a.y if a.y >= 0 else 0
             y_max = b.y if b.y < height else height - 1
@@ -340,14 +339,14 @@ class Buffer2D(ABC):
             
             composed_color_left = Color.blended(self.get_color(x_left, y), fillcolor)
             composed_color_right = Color.blended(self.get_color(x_right, y), fillcolor)
-            alpha_left = 0.0 if msaa else 1.0
-            alpha_right = 0.0 if msaa else 1.0
-            for dx, dy in msaa:
+            alpha_left = 0.0 if pattern else 1.0
+            alpha_right = 0.0 if pattern else 1.0
+            for dx, dy in pattern:
                 diff_left = abs(x_left + dx - t_left*(y + dy) - b_left)
-                alpha_left += (msaa_weight * (1.0 - diff_left)
+                alpha_left += (aa_weight * (1.0 - diff_left)
                                if diff_left < 1.0 else 0.0)
                 diff_right = abs(x_right + dx - t_right*(y + dy) - b_right)
-                alpha_right += (msaa_weight * (1.0 - diff_right)
+                alpha_right += (aa_weight * (1.0 - diff_right)
                                if diff_right < 1.0 else 0.0)
             composed_color_left.a = alpha_left
             composed_color_right.a = alpha_right
