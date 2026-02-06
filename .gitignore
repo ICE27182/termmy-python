@@ -6,6 +6,8 @@ ansi_4bit_lookup
 ansi_8bit_lookup
 PaletteLookup_*
 KeyboardRecording
+# obsidian
+.obsidian
 # mine
 *mynotes*
 tmp.*

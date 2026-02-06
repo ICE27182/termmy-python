@@ -1,0 +1,33 @@
+{
+	"nodes":[
+		{"id":"421696b0d1f02ca3","type":"group","x":-180,"y":-80,"width":1460,"height":840,"label":"Requirements"},
+		{"id":"a0ac4ec72bc2b833","type":"group","x":920,"y":-860,"width":840,"height":740,"label":"Implementation notes"},
+		{"id":"1c69780afa87357b","type":"group","x":840,"y":30,"width":400,"height":670,"label":"Output"},
+		{"id":"bf4a98e976d52fbe","type":"group","x":350,"y":60,"width":400,"height":620,"label":"Properties"},
+		{"id":"e034929b40ae9347","type":"group","x":-100,"y":60,"width":400,"height":400,"label":"Input"},
+		{"id":"0645e228eb0d68ea","type":"text","text":"parallel rendering","x":540,"y":-269,"width":250,"height":60},
+		{"id":"0e41d04f2957e00a","type":"text","text":"conditional rerendering","x":202,"y":-269,"width":250,"height":60},
+		{"id":"3fc38d916d30d2a3","type":"text","text":"Output as an image file, in addition to display in the terminal","x":900,"y":600,"width":250,"height":80},
+		{"id":"831644a50e737945","type":"text","text":"Event system","x":1340,"y":60,"width":250,"height":60},
+		{"id":"d9dcd0058c4a4657","type":"text","text":"Compatability","x":380,"y":100,"width":250,"height":60},
+		{"id":"ce860c95ef9a0bfd","type":"text","text":"I want to show geomertries","x":900,"y":70,"width":250,"height":60},
+		{"id":"23943fa44b4e123b","type":"text","text":"I want text","x":900,"y":153,"width":250,"height":60},
+		{"id":"bd21a6609a7d99bb","type":"text","text":"I want animation","x":900,"y":271,"width":250,"height":60},
+		{"id":"1a720e025bfb4c8a","type":"text","text":"I want to show images","x":900,"y":401,"width":250,"height":60},
+		{"id":"d5ce5e1fb90e6a82","type":"text","text":"Input handling","x":-45,"y":126,"width":250,"height":60},
+		{"id":"70c98853c7d3ec6b","type":"text","text":"Lowest overhead as reasonably possible","x":380,"y":186,"width":250,"height":60},
+		{"id":"7da5a4576d14ceb7","type":"text","text":"These things can be somehow linked (boxes linked by lines at certain position or in a certain way)","x":380,"y":293,"width":250,"height":108},
+		{"id":"b5c1a8bdfd774d7f","type":"text","text":"I want multiple windows","x":900,"y":500,"width":250,"height":60},
+		{"id":"0196262d48ed43b8","type":"text","text":"Creating the visuals procedurally","x":380,"y":431,"width":250,"height":60},
+		{"id":"d3a72b415985ab1d","type":"text","text":"Parsers for certain file types (bmp, png, obj, etc.)","x":-45,"y":246,"width":250,"height":55},
+		{"id":"91f82e13e7bc275d","type":"text","text":"Dont worry about having like 10 extra function calls per render","x":970,"y":-840,"width":250,"height":83},
+		{"id":"c7b9f4e77c88606a","type":"text","text":"Do worry if you need to iterate the whole frame one more time or need to add a function call to a per-pixel process","x":976,"y":-703,"width":250,"height":106},
+		{"id":"c18a69d355c6140d","x":976,"y":-560,"width":250,"height":400,"type":"text","text":"If you ever rethink about your allocator thingy, first check if this example can be handled correctly\n```python\nr = ((a * b) * c) * d\n```\nwhere `a*b` uses a temporary allocated object `t` as the returned value. The it performs `t*c`. During the operation, it writes to a newly allocated object which is also `t` since the pointer was not incremented. Now the `t` is being read while being written to and it's easy to see how it can be problematic.\n\nA possible solution maybe to enforce \n```python\nclass Allocator[T]:\n\tdef temp_allocate(*args) -> Immutable[T]: \n\t\"\"\"\n\tA reference to an object set with the arguments passed in will be returned. This object must not be mutated. This must be enforced by the programmer as no checking is implemented. If the result is mutated, it may cause data corruption.\n\t\"\"\"\n\t...\n```"},
+		{"id":"d112d924593c58cf","x":1340,"y":-560,"width":250,"height":400,"type":"text","text":"> **Explicit destinations, no hidden allocations, reuse objects in hot loops.**\n\nIn hot paths, don’t rely on operator overloading that creates temporaries. Use long-lived, caller-owned objects and explicit “write-into” methods (out.mul(a, b), out.blend(a, b)) to avoid allocations; keep operators only as convenience wrappers for non-critical code."},
+		{"id":"916c73d9fe366478","x":380,"y":540,"width":250,"height":60,"type":"text","text":""},
+		{"id":"ca3c901368a9bdda","x":1339,"y":323,"width":250,"height":60,"type":"text","text":"`▄` with bg color and text color for 4x resolution"}
+	],
+	"edges":[
+		{"id":"530a8d78e5b2b7a2","fromNode":"c18a69d355c6140d","fromSide":"right","toNode":"d112d924593c58cf","toSide":"left","toEnd":"none"}
+	]
+}
