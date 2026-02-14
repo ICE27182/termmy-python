@@ -53,6 +53,9 @@ class Buffer:
                     c.g = 255
                     c.b = 255
         return cls(width, height, data)
+    
+    def fill(self, r: int = 0, g: int = 0, b: int = 0) -> None:
+        for c in self.data: c.r, c.g, c.b = r, g, b
                 
     
     def to_ansi(self) -> str:

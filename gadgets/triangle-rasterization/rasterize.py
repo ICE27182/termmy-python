@@ -1,20 +1,37 @@
 """
-If you inline everything, you get at most 0.6% faster, but then the code gets worse
+If you inline everything, you get at most 1.3% faster, but then the code gets worse
 
 I dont think it's worth it
 
 Use 2 function calls instead.
 
-In the test case, it can rasterize nearly 30k triangles per second
+In the test case where we render 1000 triangles for 500 times, it can rasterize 26k+ triangles per second
+
+3 runs of the test with 1000 triangles and 100 iterations each. 
+Average time in seconds per triangle:
+# Run 1
+3.682624500004749e-05
+3.7306149170035494e-05
+3.7308583749982064e-05
+# Run 2
+3.7269405420011024e-05
+3.751992541001527e-05
+3.742800833002548e-05
+# Run 3
+3.7312989589991045e-05
+3.7421235000001615e-05
+3.740109792001022e-05
 """
 
-from timeit import timeit, repeat
+from timeit import repeat, timeit
+from random import random, uniform, seed, randint
 
 from data_structures import *
         
 def rasterize_triangle(triangle: Triangle, texture: Buffer, buffer: Buffer) -> None:
     # Localize data
-    txtr_w, txtr_h = texture.width, texture.height
+    txtr_w, txtr_h = texture.width, texture.height - 1
+    u_mask, v_mask = txtr_w - 1, txtr_h - 1
     buff_w, buff_h = buffer.width, buffer.height
     txtr, buff = texture.data, buffer.data
     a, b, c = triangle.a, triangle.b, triangle.c
@@ -87,7 +104,9 @@ def rasterize_triangle(triangle: Triangle, texture: Buffer, buffer: Buffer) -> N
             else: du_row = dv_row = u = v = 0.0 # Will never be used
             
             for x in range(x_left, x_right):
-                buff[buf_row_idx + x] = txtr[int(v) * txtr_w + int(u)]
+                u_, v_ = int(u) & u_mask, int(v) & v_mask
+                c_end, c_src = buff[buf_row_idx + x], txtr[v_ * txtr_w + u_]
+                c_end.r, c_end.g, c_end.b = c_src.r, c_src.g, c_src.b
                 u, v = u + du_row, v + dv_row
             
             # Increament UV for the next row
@@ -139,7 +158,9 @@ def rasterize_triangle(triangle: Triangle, texture: Buffer, buffer: Buffer) -> N
             else: du_row = dv_row = u = v = 0.0 # Will never be used
             
             for x in range(x_left, x_right):
-                buff[buf_row_idx + x] = txtr[int(v) * txtr_w + int(u)]
+                u_, v_ = int(u) & u_mask, int(v) & v_mask
+                c_end, c_src = buff[buf_row_idx + x], txtr[v_ * txtr_w + u_]
+                c_end.r, c_end.g, c_end.b = c_src.r, c_src.g, c_src.b
                 u, v = u + du_row, v + dv_row
                 
             # Increament UV for the next row
@@ -153,6 +174,7 @@ def rasterize_flat_triangle(
     t_m: float, mx: float, du_m: float, dv_m: float,
     buff: list[Color], buff_w: int, buff_h: int,
     txtr: list[Color], txtr_w: int, txtr_h: int,
+    u_mask: int, v_mask: int
 ):
     # Edge BV
     t_bv = (vx - bx) / (vy - by)
@@ -197,7 +219,9 @@ def rasterize_flat_triangle(
         else: du_row = dv_row = u = v = 0.0 # Will never be used
         
         for x in range(x_left, x_right):
-            buff[buf_row_idx + x] = txtr[int(v) * txtr_w + int(u)]
+            u_, v_ = int(u) & u_mask, int(v) & v_mask
+            c_end, c_src = buff[buf_row_idx + x], txtr[v_ * txtr_w + u_]
+            c_end.r, c_end.g, c_end.b = c_src.r, c_src.g, c_src.b
             u, v = u + du_row, v + dv_row
         
         # Increament UV for the next row
@@ -207,7 +231,8 @@ def rasterize_flat_triangle(
 
 def rasterize_triangle_with_func(triangle: Triangle, texture: Buffer, buffer: Buffer) -> None:
     # Localize data
-    txtr_w, txtr_h = texture.width, texture.height
+    txtr_w, txtr_h = texture.width, texture.height - 1
+    u_mask, v_mask = txtr_w - 1, txtr_h - 1
     buff_w, buff_h = buffer.width, buffer.height
     txtr, buff = texture.data, buffer.data
     a, b, c = triangle.a, triangle.b, triangle.c
@@ -242,7 +267,8 @@ def rasterize_triangle_with_func(triangle: Triangle, texture: Buffer, buffer: Bu
             ax, ay, au, av,
             t_ac, mx, du_ac, dv_ac,
             buff, buff_w, buff_h,
-            txtr, txtr_w, txtr_h
+            txtr, txtr_w, txtr_h,
+            u_mask, v_mask,
         )
             
     if by != cy:
@@ -252,13 +278,15 @@ def rasterize_triangle_with_func(triangle: Triangle, texture: Buffer, buffer: Bu
             cx, cy, cu, cv,
             t_ac, mx, du_ac, dv_ac,
             buff, buff_w, buff_h,
-            txtr, txtr_w, txtr_h
+            txtr, txtr_w, txtr_h,
+            u_mask, v_mask,
         )      
 
 
 def rasterize_triangle_with_loop(triangle: Triangle, texture: Buffer, buffer: Buffer) -> None:
     # Localize data
-    txtr_w, txtr_h = texture.width, texture.height
+    txtr_w, txtr_h = texture.width, texture.height - 1
+    u_mask, v_mask = txtr_w - 1, txtr_h - 1
     buff_w, buff_h = buffer.width, buffer.height
     txtr, buff = texture.data, buffer.data
     a, b, c = triangle.a, triangle.b, triangle.c
@@ -340,7 +368,9 @@ def rasterize_triangle_with_loop(triangle: Triangle, texture: Buffer, buffer: Bu
             else: du_row = dv_row = u = v = 0.0 # Will never be used
             
             for x in range(x_left, x_right):
-                buff[buf_row_idx + x] = txtr[int(v) * txtr_w + int(u)]
+                u_, v_ = int(u) & u_mask, int(v) & v_mask
+                c_end, c_src = buff[buf_row_idx + x], txtr[v_ * txtr_w + u_]
+                c_end.r, c_end.g, c_end.b = c_src.r, c_src.g, c_src.b
                 u, v = u + du_row, v + dv_row
             
             # Increament UV for the next row
@@ -356,39 +386,45 @@ triangle = Triangle(
     Vertex(30, 25, 30/80, 25/24),
 )
 
+def get_triangles(w: int, h: int, n: int, sd: int = 0) -> list[Triangle]:
+    seed(sd)
+    return [Triangle(
+        Vertex(uniform(-0.2, 1.2) * w, uniform(-0.2, 1.2) * h, random(), random()), 
+        Vertex(uniform(-0.2, 1.2) * w, uniform(-0.2, 1.2) * h, random(), random()), 
+        Vertex(uniform(-0.2, 1.2) * w, uniform(-0.2, 1.2) * h, random(), random()),
+    ) for _ in range(n)]
 
-if 1:
-    N = 100_000
-    if 0:
-        def benchmark(*args, **kwargs):
-            result = timeit(*args, **kwargs)
-            print(
-                result / N
-            )
-    else:
-        def benchmark(*args, **kwargs):
-            result = repeat(*args, **kwargs)
-            print(
-                min(result) / N
-            )
+if 0:
+    N = 100
+    M = 1000
+    def benchmark(rasterize_triangle, n, m):
+        seed(0)
+        triangles = get_triangles(80, 24, m)
+        def callback():
+            for t in triangles:
+                rasterize_triangle(t, txtr, frame)
+        result = min(repeat(callback, number=n))
+        print(
+            result / n / m
+        )
             
-    benchmark(lambda: rasterize_triangle(
-        triangle=triangle,
-        texture=txtr,
-        buffer=frame
-    ), number=N)
+    benchmark(rasterize_triangle, N, M)
 
-    benchmark(lambda: rasterize_triangle_with_func(
-        triangle=triangle,
-        texture=txtr,
-        buffer=frame
-    ), number=N)
+    benchmark(rasterize_triangle_with_func, N, M)
     
-    benchmark(lambda: rasterize_triangle_with_loop(
-        triangle=triangle,
-        texture=txtr,
-        buffer=frame
-    ), number=N)
+    benchmark(rasterize_triangle_with_loop, N, M)
+elif 1:
+    M = 1000
+    N = 500
+    seed(0)
+    triangles = get_triangles(80, 24, M)
+    def callback():
+        for t in triangles:
+            rasterize_triangle(t, txtr, frame)
+    result = timeit(callback, number=N)
+    print(
+        result / N / M
+    )
 
 if 0:
     rasterize_triangle(
@@ -402,11 +438,27 @@ elif 0:
         texture=txtr,
         buffer=frame
     )
-else:
+elif 0:
     rasterize_triangle_with_loop(
         triangle=triangle,
         texture=txtr,
         buffer=frame
     )
-
-print(frame.to_ansi())
+    
+if 0:
+    frame.fill(30, 30, 30)
+    N = 10
+    triangles = get_triangles(80, 24, N, 1)
+    seed(0)
+    for t in triangles:
+        txtr.fill(randint(0, 255), randint(0, 255), randint(0, 255))
+        rasterize_triangle_with_func(
+            triangle=t,
+            texture=txtr,
+            buffer=frame,
+        )
+        print(frame.to_ansi())
+        print(f"{t.a.x:.1f} {t.a.y:.1f}\n{t.b.x:.1f} {t.b.y:.1f}\n{t.c.x:.1f} {t.c.y:.1f}")
+        input()
+else:
+    print(frame.to_ansi())
