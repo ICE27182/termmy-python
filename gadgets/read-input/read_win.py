@@ -77,10 +77,14 @@ with terminal_mode():
     print("Move your mouse! (Press Ctrl+C to stop)\nBegin:")
     last = 0.0
     for _ in range(20):
-        while True:
-            char = sys.stdin.read(1)
-            print(str(char.encode("latin-1"))[2:-1], end="")
-            if time() - last > 0.1:
-                break
-        print("")
-        last = time()
+        loop = True
+        while loop:
+            char = sys.stdin.buffer.read(1)
+            if time() - last > 0.1 or char == b"\033":
+                sys.stdout.write("\r\n")
+                sys.stdout.flush()
+                last = time()
+                loop = False
+            # sys.stdout.write(str(char.encode("latin-1"))[2:-1])
+            sys.stdout.write(str(char)[2:-1])
+            sys.stdout.flush()
