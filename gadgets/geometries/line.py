@@ -1,0 +1,27 @@
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Final
+
+from basics import Vertex, Color, Triangle, Buffer
+from rectangle import Rectangle
+
+@dataclass(slots=True, frozen=False)
+class Line:
+    thickness: float
+    # start and end allows variable uv
+    _start: Vertex
+    _end: Vertex
+    _texture: Buffer
+    
+    @classmethod
+    def from_length(cls, length: float, start: Vertex, 
+                    end_uv: tuple[float, float], 
+                    thickness: float = 1.0) -> Line: ...
+    
+    def to_rectangle(self) -> Rectangle: ...
+    
+    def triangulate(self) -> list[Triangle]:
+        return self.to_rectangle().triangulate()
+    
