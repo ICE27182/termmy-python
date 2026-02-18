@@ -1,3 +1,11 @@
+raise NotImplementedError(
+    "How the program treats the uv wrapping is flawed.\n"
+    "Currently `rasterize_triangle` and `rasterize_triangle_with_loop` "
+    "use the bitwise AND for the wrapping, which does not work properly "
+    "when the texture size is not a power of 2.\n"
+    "And `rasterize_triangle_with_func` uses the modulo operator, "
+    "which works but is slower than the other two functions\n"
+)
 """
 If you inline everything, you get at most 1.3% faster, but then the code gets worse
 
@@ -420,7 +428,7 @@ elif 1:
     triangles = get_triangles(80, 24, M)
     def callback():
         for t in triangles:
-            rasterize_triangle(t, txtr, frame)
+            rasterize_triangle_with_func(t, txtr, frame)
     result = timeit(callback, number=N)
     print(
         result / N / M
