@@ -2,22 +2,15 @@ from data_structures import *
 
 from enum import StrEnum, auto
 from dataclasses import dataclass
+from typing import Iterable
+from anti_aliasing_setting import AntiAliasingSettings
 
-class TranslucencySettings(StrEnum):
-    OPAQUE = auto()
-    TRANSPARENT = auto()
-    TRANSLUCENT = auto()
-
-class AntialiasingSettings(StrEnum):
-    NONE = auto()
-    MSAA = auto()
-    AAA = auto()
 
 @dataclass(slots=True)
 class RasterizationSettings:
-    translucency: TranslucencySettings
-    antialiasing: AntialiasingSettings
-    
+    anti_aliasing: AntiAliasingSettings
+
+
 def rasterize_triangle_with_func(
     triangle: Triangle, 
     texture: Buffer, 
@@ -37,7 +30,6 @@ def rasterize_triangle_with_func(
     ax, ay = a.x, a.y
     bx, by = b.x, b.y
     cx, cy = c.x, c.y
-    
     au, av = a.u * txtr_w, a.v * txtr_h
     bu, bv = b.u * txtr_w, b.v * txtr_h
     cu, cv = c.u * txtr_w, c.v * txtr_h
@@ -110,7 +102,7 @@ def rasterize_flat_triangle(
         
         # X range
         x_left = int(t_left * (y - vy) + vx)
-        x_right = int(t_right * (y - vy) + vx) + 1
+        x_right = int(t_right * (y - vy) + vx)
         if x_left < 0: x_left = 0
         if x_right > buff_w: x_right = buff_w
         
@@ -122,14 +114,10 @@ def rasterize_flat_triangle(
             dv_row = (v_right - v_left) / x_diff
             u, v = u_left, v_left
         else: du_row = dv_row = u = v = 0.0 # Will never be used
-        
-        for x in range(x_left, x_right):
-            u_, v_ = int(u), int(v)
-            if u_ < 0: u_ = 0
-            elif u_ >= txtr_w: u_ = txtr_w - 1
-            if v_ < 0: v_ = 0
-            elif v_ > txtr_h_: v_ = txtr_h_
-            
+                
+        # Middle pixels
+        for x in range(x_left + 1, x_right):
+            u_, v_ = int(u) % txtr_w, int(v) % txtr_h_
             c_end, c_src = buff[buf_row_idx + x], txtr[v_ * txtr_w + u_]
             c_end.r, c_end.g, c_end.b = c_src.r, c_src.g, c_src.b
             

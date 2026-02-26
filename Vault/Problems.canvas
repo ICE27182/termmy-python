@@ -1,22 +1,23 @@
 {
 	"nodes":[
-		{"id":"ee83f4a27c00468e","x":-129,"y":-420,"width":250,"height":203,"type":"text","text":"When rasterizing a triangle, the uv coordinates interpolated for the edge pixels can fall out of the buffer due to the discretization of the vertex coordinates"},
-		{"id":"a4143926c8949e58","x":121,"y":-60,"width":250,"height":157,"color":"2","type":"text","text":"The current `gadgets/triangle-rasterizationrasterize.py` is not working for buffer with size that is not $2^n$"},
-		{"id":"cd384466617e2a3e","x":-280,"y":-707,"width":250,"height":114,"type":"text","text":"Provide 2 modes with the 2 operators. If the buffer size is $2^n$ then use the faster `&`. Otherwise use the slower `%`."},
-		{"id":"cf0c5e69641031d0","x":-280,"y":-980,"width":250,"height":120,"type":"text","text":"Without function inlining, you need 2 functions for rasterizing a flat triangle, just to modify an operator"},
-		{"id":"07596525200c831d","x":-129,"y":-1173,"width":250,"height":60,"type":"text","text":"accept it"},
-		{"id":"99d28eee7bf38937","x":-440,"y":-1200,"width":250,"height":87,"color":"1","type":"text","text":"Use a function reference to either `operator.and_` or `operator.mod`"},
-		{"id":"012430b510107792","x":-1040,"y":-913,"width":250,"height":60,"type":"text","text":"It doesnt work for buffers with a different size"},
-		{"id":"0694930caf4c3691","x":-1040,"y":-755,"width":250,"height":162,"type":"text","text":"`uv = uv & size_mask` where `size_mask = size - 1` works well for buffers of size $2^n$ with little performance penalty"},
-		{"id":"653cd373674f0748","x":-734,"y":-920,"width":250,"height":60,"type":"text","text":"It requires 2 extra `%` per pixel and thus is slower"},
-		{"id":"4262b27b3bbd6ec9","x":-734,"y":-707,"width":250,"height":114,"type":"text","text":"`uv = uv % (size - 1)` works well for all kinds of buffer"},
-		{"id":"df2b595d7139c13c","x":-734,"y":-1052,"width":250,"height":60,"type":"text","text":"accept it"},
-		{"id":"868f9e8045b8a6de","x":500,"y":-1073,"width":250,"height":93,"type":"text","text":"The shifting is at a sub-pixel level so it should not be a problem"},
-		{"id":"ff65c7e7442ef539","x":500,"y":-920,"width":250,"height":60,"type":"text","text":"All pixel colors would then be shifted"},
-		{"id":"d38874d2c2f46ac2","x":625,"y":-653,"width":250,"height":60,"type":"text","text":"Align the uv at edges"},
-		{"id":"e9fbf13edbd4cf49","x":780,"y":-980,"width":250,"height":120,"type":"text","text":"It is easy to align the uv at the left edge but for the right edge you still need special attention"},
-		{"id":"2eb5a06c32f54fdb","x":121,"y":-674,"width":250,"height":84,"type":"text","text":"Treat the edge pixels specially. This works with the MSAA and AAA"},
-		{"id":"deab70358b13b36a","x":121,"y":-992,"width":250,"height":139,"type":"text","text":"More complex implementation and slower speed for simple cases where no anti-aliasing is not used"}
+		{"id":"ee83f4a27c00468e","type":"text","text":"When rasterizing a triangle, the uv coordinates interpolated for the edge pixels can fall out of the buffer due to the discretization of the vertex coordinates","x":-129,"y":-420,"width":250,"height":203},
+		{"id":"a4143926c8949e58","type":"text","text":"The current `gadgets/triangle-rasterizationrasterize.py` is not working for buffer with size that is not $2^n$","x":121,"y":-60,"width":250,"height":157,"color":"2"},
+		{"id":"cd384466617e2a3e","type":"text","text":"Provide 2 modes with the 2 operators. If the buffer size is $2^n$ then use the faster `&`. Otherwise use the slower `%`.","x":-280,"y":-707,"width":250,"height":114},
+		{"id":"cf0c5e69641031d0","type":"text","text":"Without function inlining, you need 2 functions for rasterizing a flat triangle, just to modify an operator","x":-280,"y":-980,"width":250,"height":120},
+		{"id":"07596525200c831d","type":"text","text":"accept it","x":-129,"y":-1173,"width":250,"height":60},
+		{"id":"99d28eee7bf38937","type":"text","text":"Use a function reference to either `operator.and_` or `operator.mod`","x":-440,"y":-1200,"width":250,"height":87,"color":"1"},
+		{"id":"012430b510107792","type":"text","text":"It doesnt work for buffers with a different size","x":-1040,"y":-913,"width":250,"height":60},
+		{"id":"0694930caf4c3691","type":"text","text":"`uv = uv & size_mask` where `size_mask = size - 1` works well for buffers of size $2^n$ with little performance penalty","x":-1040,"y":-755,"width":250,"height":162},
+		{"id":"653cd373674f0748","type":"text","text":"It requires 2 extra `%` per pixel and thus is slower","x":-734,"y":-920,"width":250,"height":60},
+		{"id":"4262b27b3bbd6ec9","type":"text","text":"`uv = uv % (size - 1)` works well for all kinds of buffer","x":-734,"y":-707,"width":250,"height":114},
+		{"id":"df2b595d7139c13c","type":"text","text":"accept it and provide a texture resizer","x":-734,"y":-1052,"width":250,"height":60},
+		{"id":"2eb5a06c32f54fdb","type":"text","text":"Treat the edge pixels specially. This works with the MSAA and AAA","x":121,"y":-674,"width":250,"height":84},
+		{"id":"868f9e8045b8a6de","type":"text","text":"The shifting is at a sub-pixel level so it should not be a problem","x":700,"y":-1073,"width":250,"height":93},
+		{"id":"ff65c7e7442ef539","type":"text","text":"All pixel colors would then be shifted","x":700,"y":-920,"width":250,"height":60},
+		{"id":"d38874d2c2f46ac2","type":"text","text":"Align the uv at edges","x":825,"y":-653,"width":250,"height":60},
+		{"id":"e9fbf13edbd4cf49","type":"text","text":"It is easy to align the uv at the left edge but for the right edge you still need special attention","x":980,"y":-980,"width":250,"height":120},
+		{"id":"deab70358b13b36a","type":"text","text":"More complex implementation and slower speed for simple cases where no anti-aliasing is not used","x":371,"y":-999,"width":250,"height":139},
+		{"id":"e81f61ff9c45f87c","x":40,"y":-1009,"width":250,"height":159,"type":"text","text":"Note that just taking the 2 pixels on the leftmost and rightmost ends of each row is not enough for AA and uv mapping if the edge has a slope k less than 1"}
 	],
 	"edges":[
 		{"id":"0672c9bcc187292d","fromNode":"a4143926c8949e58","fromSide":"left","toNode":"ee83f4a27c00468e","toSide":"bottom"},
@@ -34,6 +35,7 @@
 		{"id":"be3153b31d0a25b9","fromNode":"cf0c5e69641031d0","fromSide":"top","toNode":"07596525200c831d","toSide":"bottom"},
 		{"id":"48af3dcf889d8a3e","fromNode":"653cd373674f0748","fromSide":"top","toNode":"df2b595d7139c13c","toSide":"bottom"},
 		{"id":"cb47a159a2ac91ec","fromNode":"2eb5a06c32f54fdb","fromSide":"top","toNode":"deab70358b13b36a","toSide":"bottom"},
-		{"id":"d253b4f27f03d18e","fromNode":"ee83f4a27c00468e","fromSide":"top","toNode":"2eb5a06c32f54fdb","toSide":"bottom"}
+		{"id":"d253b4f27f03d18e","fromNode":"ee83f4a27c00468e","fromSide":"top","toNode":"2eb5a06c32f54fdb","toSide":"bottom"},
+		{"id":"e68747cfe3a3169e","fromNode":"2eb5a06c32f54fdb","fromSide":"top","toNode":"e81f61ff9c45f87c","toSide":"bottom"}
 	]
 }
