@@ -4,6 +4,60 @@ from dataclasses import dataclass
 from itertools import islice
 from typing import Final
 
+from linear_algebra import *
+
+@dataclass(slots=True)
+class Transform:
+    mat4: Matrix4dTuple
+    
+    @classmethod
+    def identity(cls) -> Transform:
+        return cls((
+            1.0, 0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0,
+        ))
+    @classmethod
+    def translation(cls, x: float, y: float, z: float) -> Transform:
+        return cls((
+            1.0, 0.0, 0.0, x,
+            0.0, 1.0, 0.0, y,
+            0.0, 0.0, 1.0, z,
+            0.0, 0.0, 0.0, 1.0,
+        ))
+    @classmethod
+    def scaling(cls, x: float, y: float, z: float) -> Transform:
+        return cls((
+            x, 0.0, 0.0, 0.0,
+            0.0, y, 0.0, 0.0,
+            0.0, 0.0, z, 0.0,
+            0.0, 0.0, 0.0, 1.0,
+        ))
+    @classmethod
+    def rotation_z(cls, radians: float) -> Transform:
+        return cls(rot_mat_z(radians))
+    @classmethod
+    def rotation_y(cls, radians: float) -> Transform:
+        return cls(rot_mat_y(radians))
+    @classmethod
+    def rotation_x(cls, radians: float) -> Transform:
+        return cls(rot_mat_x(radians))
+    
+    def translate(self, x: float, y: float, z: float) -> Transform:
+        return Transform(mat4t_mul(self.mat4,
+                         Transform.translation(x, y, z).mat4))
+    def scale(self, x: float, y: float, z: float) -> Transform:
+        return Transform(mat4t_mul(self.mat4,
+                         Transform.scaling(x, y, z).mat4))
+    def rotate_z(self, radians: float) -> Transform:
+        return Transform(mat4t_mul(self.mat4, rot_mat_z(radians)))
+    def rotate_y(self, radians: float) -> Transform:
+        return Transform(mat4t_mul(self.mat4, rot_mat_y(radians)))
+    def rotate_x(self, radians: float) -> Transform:
+        return Transform(mat4t_mul(self.mat4, rot_mat_x(radians)))
+
+
 @dataclass(slots=True, frozen=False)
 class Vertex:
     x: float
