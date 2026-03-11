@@ -75,7 +75,7 @@ class Color:
 
 
 @dataclass(slots=True, frozen=False)
-class Triangle:
+class RasterizationTriangle:
     a: Final[Vertex]
     b: Final[Vertex]
     c: Final[Vertex]

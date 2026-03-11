@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final
 
-from basics import Vertex, Color, Triangle, Buffer
+from basics import Vertex, Color, RasterizationTriangle, Buffer
 from rectangle import Rectangle
 
 @dataclass(slots=True, frozen=False)
@@ -22,6 +22,6 @@ class Line:
     
     def to_rectangle(self) -> Rectangle: ...
     
-    def triangulate(self) -> list[Triangle]:
+    def triangulate(self) -> list[RasterizationTriangle]:
         return self.to_rectangle().triangulate()
     
