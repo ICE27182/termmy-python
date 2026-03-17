@@ -7,9 +7,12 @@ from typing import Self, ClassVar
 from dataclasses import dataclass, field
 from queue import Queue
 from enum import StrEnum, auto
-from sys import platform
+# Must be imported as a module for static analysis
+# `from sys import platform` will not work for the static analyzer
+import sys
 
-if platform == "win32":
+
+if sys.platform == "win32":
     from ._env_setup_win import _WinTermEnv as _TermEnv
 else:
     from ._env_setup_unix import _UnixTermEnv as _TermEnv
@@ -60,7 +63,7 @@ class InputEvent:
 # It appears the static analyzer may have some trouble understanding _TermEnv
 # It is not a problem in the runtime. Thus the type ignore
 @dataclass(slots=True, frozen=True)
-class TermIOHub(_TermEnv): # type: ignore
+class TermIOHub(_TermEnv):
     _active_instance: ClassVar[None | TermIOHub] = None
     # One producer, multiple consumers
     _inputs: deque[str] = field(default_factory=deque)
