@@ -105,4 +105,4 @@ else: # POSIX
         def __exit__(self, exc_type, exc_val, exc_tb) -> None:
             stdout.write(DISABLE_MOUSE)
             stdout.flush()
-            termios.tcsetattr(_FD, termios.TCSADRAIN, _OLD_SETTINGS)
+            termios.tcsetattr(self._fd, termios.TCSADRAIN, self._old_settings)
