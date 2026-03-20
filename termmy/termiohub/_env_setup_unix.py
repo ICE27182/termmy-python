@@ -2,6 +2,7 @@ from tty import setraw
 from termios import tcgetattr, tcsetattr, TCSADRAIN
 from dataclasses import dataclass, field
 from sys import stdin, stdout
+from typing import Self
 
 
 ENABLE_MOUSE = "\x1b[?1003h\x1b[?1006h"
@@ -15,10 +16,11 @@ class _UnixTermEnv:
         default_factory= lambda: tcgetattr(stdin.fileno()),
     )
 
-    def __enter__(self) -> None:
+    def __enter__(self) -> Self:
         setraw(self.fd)
         stdout.write(ENABLE_MOUSE)
         stdout.flush()
+        return self
     
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         stdout.write(DISABLE_MOUSE)

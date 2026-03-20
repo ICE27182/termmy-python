@@ -4,6 +4,7 @@ from mimetypes import init
 from time import time
 from dataclasses import dataclass, field
 from sys import stdin, stdout
+from typing import Self
 
 
 # Windows API Constants
@@ -69,11 +70,12 @@ class _WinTermEnv:
     original_in_config: DWORD = field(init=False, default_factory=DWORD)
     original_out_config: DWORD = field(init=False, default_factory=DWORD)
 
-    def __enter__(self) -> None:
+    def __enter__(self) -> Self:
         _store_win_term_into(self.original_in_config, self.original_out_config)
         _setup_win_io_config()
         stdout.write(ENABLE_MOUSE)
         stdout.flush()
+        return self
     
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         stdout.write(DISABLE_MOUSE)
