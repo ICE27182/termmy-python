@@ -1,3 +1,8 @@
+# TODO
+# 1. Add a timeout on parse (necessaryin edge cases: 
+#    dfa = State.numbers(is_final=False) and q[0][0] is a number)
+# 2. Merge States
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -8,13 +13,96 @@ from itertools import islice, chain
 
 # from termmy.termiohub.input_event import MouseInput, KeyboardInput, InputEvent
 
-def parse(q: deque[tuple[bytes, float]], seq_timeout: float, 
-           current_time: float) -> InputEvent | None:
+def parse(q: deque[tuple[bytes, float]], dfa: State,
+          seq_timeout: float, current_time: float) -> tuple[bytes, float] | None:
+    """
+    Parse the input q with the given DFA. q may be mutated (via popleft).
+    
+    Args:
+        q (deque[tuple[bytes, float]]): The input queue. 
+            Each element is a tuple of a single byte and its timestamp. 
+            The byte is expected to be an ascii character.
+            
+        dfa (State): The DFA to parse the input sequence.
+        
+        seq_timeout (float): If a string is accepted by the DFA, 
+            but it is also a prefix that maybe accepted, the parser will
+            wait for more input until the timeout expires. If the timeout
+            expires, the longest accepted prefix will be returned. 
+            In most cases, this only applies to the ESC key.
+    """
+    # There are the following cases
+    # 1. The first characters is not accepted by the DFA, i.e. it is an
+    #    unknown character byte (e.g. 0xFF). In this case, we will just
+    #    return it as a single-character sequence. One item from q will
+    #    be consumed.
+    # 2. The first character is accepted by the DFA and it is not a prefix
+    #    of any longer sequence that might be accepted (e.g. b'A', b'*'). 
+    #    In this case, we will return it. One item from q will be consumed.
+    # 3. The first character is accepted by the DFA and it may also be a 
+    #    prefix of a longer sequence.
+    #    1. If the first character is pressed very recently before the 
+    #       seq_timeout and there is no more input, we will put it back and
+    #       return None, waiting for more input to arrive. No item from q 
+    #       will be consumed.
+    #    2. Otherwise, we will try to parse as many input as possible until
+    #       there is no more input or the timeout expires. The longest
+    #       accepted sequence will be returned. The corresponding number of
+    #       items will be consumed from q.
+    #    * The ESC case will be handled by 3.2. 
+    #    * Normal escape sequences will be handled by 3.1 and 3.2
+    #    * Unknown sequences will be handled by 3.2, where the prefix that
+    #      passes 3 will at least be returned. At least one item will be 
+    #      consumed from q.
+    
     if not q:
         return None
     
     char, timestamp = q.popleft()
-    char = char.decode("latin-1")
+    state = dfa.single_transit(char[0])
+    if state is None or state.is_final and not state.transition:
+        return (char, timestamp)
+    
+    # Below is the case where we are dealing with a potential sequence
+    
+    chars: list[bytes] = [char]
+    timestamps: list[float] = [timestamp]
+    
+    # Used in the case where the first char may be accepted by the DFA, 
+    # but it may also be a prefix of a longer sequence.
+    # Most commonly, it is only meant to handle the single ESC key strike,
+    # but it should also work for any other similar cases (likely defined
+    # by the user)
+    if state.is_final and current_time - timestamp > seq_timeout:
+        longest_accepted_length = 1
+    else:
+        longest_accepted_length = 0
+    
+    while q:
+        char, timestamp = q.popleft()
+        chars.append(char)
+        timestamps.append(timestamp)
+        
+        if timestamp - timestamps[0] > seq_timeout:
+            break # Timeout, return the longest accepted prefix
+        
+        next_state = state.single_transit(char[0])
+        if next_state is None:
+            break # No further transition, return the longest accepted prefix
+        elif next_state.is_final:
+            longest_accepted_length = len(chars)
+        state = next_state
+    
+    # Prepare the output
+    if longest_accepted_length > 0:
+        out = (b"".join(chars[:longest_accepted_length]), timestamps[0])
+    else:
+        out = None
+    # Revert the unused input
+    q.extendleft(zip(reversed(chars[longest_accepted_length::]), 
+                         reversed(timestamps[longest_accepted_length::])))
+    return out
+    
 
 
 T = TypeVar("T")
@@ -168,6 +256,12 @@ class State:
                     
         last_state.is_final = is_final
         return root
+    
+    @staticmethod
+    def merge(states: list[State]) -> State:
+        # BFS from the root of each state
+        # `Visited` may come in handy with creating new states
+        raise NotImplementedError
     
     def link(self, upon: int, target: State) -> State:
         """
