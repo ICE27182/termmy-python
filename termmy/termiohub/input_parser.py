@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable, Iterable, TypeVar, Generic
+from typing import Callable, Iterable, TypeVar, Generic, Generator
 from collections import deque
 from re import compile
-from itertools import islice
+from itertools import islice, chain
 
 # from termmy.termiohub.input_event import MouseInput, KeyboardInput, InputEvent
 
@@ -128,35 +128,45 @@ class State:
         
         Returns:
             State: The root state of the state machine.
-        """         
-        if not cons_list: 
-            return cls({}, True)
+        """
+
+        instructions = _expanded_instructions(cons_list)
         
-        last_was_callable = False
-        root = cls({}, False)
-        state = root
+        linkage: int | None = None
+        first: int | Callable[[bool], State] | None = next(instructions, None)
         
-        for instruction in cons_list:
+        match first:
+            case None:
+                return cls({}, is_final)
+            case int():
+                root = last_state = cls({}, False)
+                linkage = first
+            case _ if callable(first):
+                root = last_state = first(False)
+            case _:
+                raise _CONSTRUCTOR_LIST_TYPE_ERROR
+        
+        for instruction in instructions:
             match instruction:
-                case bytes():
-                    bytes_chain = State.from_bytes(instruction[1:], False)
-                    state = (state.link(instruction[0], bytes_chain)
-                                    .last_of_the_chain())
-                    last_was_callable = False
+                case int():
+                    if linkage is None:
+                        linkage = instruction
+                    else:
+                        last_state = last_state.link(linkage, State({}, False))
+                        linkage = instruction
                 case _ if callable(instruction):
-                    if last_was_callable:
-                        raise ValueError("Constructor list must start "
-                                         "with a bytes object")
-                    new_state = instruction(False)
-                    state.copy_transitions_from(new_state)
-                    
-                    last_was_callable = True
+                    if linkage is None:
+                        raise ValueError("There must be at least one bytes "
+                                         "object between constructors")
+                    last_state = last_state.link(linkage, instruction(False))
+                    linkage = None
                 case _:
-                    raise ValueError("Constructor list must only contain "
-                                     "bytes objects and callables")
-            print(root.to_str())
+                    raise _CONSTRUCTOR_LIST_TYPE_ERROR
+        
+        if linkage is not None:
+            last_state = last_state.link(linkage, State({}, False))
                     
-        state.is_final = is_final
+        last_state.is_final = is_final
         return root
     
     def link(self, upon: int, target: State) -> State:
@@ -205,6 +215,23 @@ class State:
             raise ValueError("Cannot copy transitions from a state that has "
                              "overlapping transition keys")
         self.transition.update(state.transition)
+
+
+
+_CONSTRUCTOR_LIST_TYPE_ERROR = TypeError("Constructor list must only "
+                                         "contain bytes objects and "
+                                         "callables that take a boolean "
+                                         "and return a State object")
+
+def _expanded_instructions(
+            cons_list: Iterable[bytes | Callable[[bool], State]],
+        ) -> Generator[int | Callable[[bool], State], None, None]:
+            for ins in cons_list:
+                match ins:
+                    case bytes(): yield from ins
+                    case _ if callable(ins): yield ins
+                    case _: raise _CONSTRUCTOR_LIST_TYPE_ERROR
+
 
 if __name__ == "__main__":
     # Debug from_constructor_list
