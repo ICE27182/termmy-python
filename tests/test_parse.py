@@ -32,49 +32,49 @@ class TestParse(unittest.TestCase):
 
     def test_empty_queue_returns_none(self):
         q = deque()
-        out = parse(q, self.dfa, self.timeout, current_time=1.0)
+        out = parse(q, self.dfa, self.timeout, latency_timeout=0.1, current_time=1.0)
         self.assertIsNone(out)
         self.assertEqual(len(q), 0)
 
     def test_unknown_byte_returns_single_char_and_consumes(self):
         q = deque([(b"Z", 1.0)])
-        out = parse(q, self.dfa, self.timeout, current_time=1.1)
+        out = parse(q, self.dfa, self.timeout, latency_timeout=0.1, current_time=1.1)
         self.assertEqual(out, (b"Z", 1.0))
         self.assertEqual(len(q), 0)
 
     def test_final_non_prefix_returns_immediately(self):
         q = deque([(b"X", 1.0)])
-        out = parse(q, self.dfa, self.timeout, current_time=1.01)
+        out = parse(q, self.dfa, self.timeout, latency_timeout=0.1, current_time=1.01)
         self.assertEqual(out, (b"X", 1.0))
         self.assertEqual(len(q), 0)
 
     def test_esc_within_timeout_waits_and_does_not_consume(self):
         q = deque([(b"\x1b", 1.0)])
-        out = parse(q, self.dfa, self.timeout, current_time=1.02)
+        out = parse(q, self.dfa, self.timeout, latency_timeout=0.1, current_time=1.02)
         self.assertIsNone(out)
         self.assertEqual(list(q), [(b"\x1b", 1.0)])
 
     def test_esc_after_timeout_returns_esc_and_consumes(self):
         q = deque([(b"\x1b", 1.0)])
-        out = parse(q, self.dfa, self.timeout, current_time=1.2)
+        out = parse(q, self.dfa, self.timeout, latency_timeout=0.1, current_time=1.2)
         self.assertEqual(out, (b"\x1b", 1.0))
         self.assertEqual(len(q), 0)
 
     def test_full_escape_sequence_returns_longest_match(self):
         q = deque([(b"\x1b", 1.0), (b"[", 1.01), (b"A", 1.02)])
-        out = parse(q, self.dfa, self.timeout, current_time=1.03)
+        out = parse(q, self.dfa, self.timeout, latency_timeout=0.1, current_time=1.03)
         self.assertEqual(out, (b"\x1b[A", 1.0))
         self.assertEqual(len(q), 0)
 
     def test_unknown_continuation_returns_longest_prefix_and_pushes_back_unused(self):
         q = deque([(b"\x1b", 1.0), (b"[", 1.01), (b"B", 1.02)])
-        out = parse(q, self.dfa, self.timeout, current_time=1.06)
+        out = parse(q, self.dfa, self.timeout, latency_timeout=0.1, current_time=1.06)
         self.assertEqual(out, (b"\x1b", 1.0))
         self.assertEqual(list(q), [(b"[", 1.01), (b"B", 1.02)])
 
     def test_timeout_mid_sequence_returns_longest_prefix_and_pushes_back_tail(self):
         q = deque([(b"\x1b", 1.0), (b"[", 1.01), (b"A", 1.20)])
-        out = parse(q, self.dfa, self.timeout, current_time=1.21)
+        out = parse(q, self.dfa, self.timeout, latency_timeout=0.1, current_time=1.21)
         self.assertEqual(out, (b"\x1b", 1.0))
         self.assertEqual(list(q), [(b"[", 1.01), (b"A", 1.20)])
 
