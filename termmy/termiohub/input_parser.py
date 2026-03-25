@@ -1,7 +1,7 @@
 # TODO
-# 1. Add a timeout on parse (necessaryin edge cases: 
-#    dfa = State.numbers(is_final=False) and q[0][0] is a number)
-# 2. Merge States
+# -[x] Add a timeout on parse (necessaryin edge cases: 
+#       dfa = State.numbers(is_final=False) and q[0][0] is a number)
+# -[ ] Merge States
 
 from __future__ import annotations
 
@@ -14,7 +14,8 @@ from itertools import islice, chain
 # from termmy.termiohub.input_event import MouseInput, KeyboardInput, InputEvent
 
 def parse(q: deque[tuple[bytes, float]], dfa: State,
-          seq_timeout: float, current_time: float) -> tuple[bytes, float] | None:
+          seq_timeout: float, latency_timeout: float,
+          current_time: float) -> tuple[bytes, float] | None:
     """
     Parse the input q with the given DFA. q may be mutated (via popleft).
     
@@ -30,6 +31,11 @@ def parse(q: deque[tuple[bytes, float]], dfa: State,
             wait for more input until the timeout expires. If the timeout
             expires, the longest accepted prefix will be returned. 
             In most cases, this only applies to the ESC key.
+            
+        latency_timeout (float): Timeout for latency issues. All input 
+        that is received before the timeout will be discarded.
+        
+        current_time (float): The current time, used for timeout calculation.
     """
     # There are the following cases
     # 1. The first characters is not accepted by the DFA, i.e. it is an
@@ -54,6 +60,13 @@ def parse(q: deque[tuple[bytes, float]], dfa: State,
     #    * Unknown sequences will be handled by 3.2, where the prefix that
     #      passes 3 will at least be returned. At least one item will be 
     #      consumed from q.
+    #
+    # For the timeout sequences, we will still parse the input, even though
+    # the first character may have already passed the timeout. This is to
+    # handle the case where the first character may be timed out but the 
+    # rest of the sequence is still valid, leading to a broken sequence
+    # that should have been dumped being treated as separate characters /
+    # unknown sequences.
     
     if not q:
         return None
@@ -61,7 +74,10 @@ def parse(q: deque[tuple[bytes, float]], dfa: State,
     char, timestamp = q.popleft()
     state = dfa.single_transit(char[0])
     if state is None or state.is_final and not state.transition:
-        return (char, timestamp)
+        if current_time - timestamp > latency_timeout:
+            return parse(q, dfa, seq_timeout, latency_timeout, current_time)
+        else:
+            return (char, timestamp)
     
     # Below is the case where we are dealing with a potential sequence
     
@@ -100,12 +116,17 @@ def parse(q: deque[tuple[bytes, float]], dfa: State,
         out = None
     # Revert the unused input
     q.extendleft(zip(reversed(chars[longest_accepted_length::]), 
-                         reversed(timestamps[longest_accepted_length::])))
-    return out
+                     reversed(timestamps[longest_accepted_length::])))
+    
+    if current_time - timestamps[0] > latency_timeout:
+        return parse(q, dfa, seq_timeout, latency_timeout, current_time)
+    else:
+        return out
     
 
 
 T = TypeVar("T")
+
 @dataclass(slots=True, frozen=False)
 class Visited(Generic[T]):
     visited: dict[int, int] = field(default_factory=dict)
