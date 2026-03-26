@@ -95,6 +95,128 @@ class TestState(unittest.TestCase):
         with self.assertRaises(ValueError):
             State.from_constructor_list([State.numbers, State.numbers])
 
+class TestMergeStates(unittest.TestCase):
+    def assert_accepts(self, dfa: State, seq: bytes) -> None:
+        state = dfa.multi_transit(seq)
+        self.assertIsNotNone(state)
+        assert state is not None  # For type checker
+        self.assertTrue(state.is_final)
+
+    def assert_rejects(self, dfa: State, seq: bytes) -> None:
+        state = dfa.multi_transit(seq)
+        self.assertTrue(state is None or not state.is_final)
+    
+    # Base cases
+    
+    def test_merge_0_states(self):
+        out = State.merge(*[])
+        self.assertFalse(out.is_final)
+        self.assertEqual(out.transition, {})
+    
+    def test_merge_1_non_finalstate(self):
+        out = State.merge(*[State({}, False)])
+        self.assertFalse(out.is_final)
+        self.assertEqual(out.transition, {})
+
+    def test_merge_1_final_state(self):
+        out = State.merge(*[State({}, True)])
+        self.assertTrue(out.is_final)
+        self.assertEqual(out.transition, {})
+    
+    def test_merge_2_small_states(self):
+        s1 = State({ord("A"): State({}, True)}, False)
+        s2 = State({ord("B"): State({}, False)}, False)
+        out = State.merge(*[s1, s2])
+        self.assertFalse(out.is_final)
+        self.assertIn(ord("A"), out.transition)
+        self.assertIn(ord("B"), out.transition)
+        trans_a = out.single_transit(ord("A"))
+        trans_b = out.single_transit(ord("B"))
+        self.assertIsNotNone(trans_a); assert trans_a is not None # For type checker
+        self.assertIsNotNone(trans_b); assert trans_b is not None # For type checker
+        self.assertTrue(trans_a.is_final)
+        self.assertFalse(trans_b.is_final)
+
+    def test_merge_shared_prefix_combines_finality(self):
+        s1 = State.from_bytes(b"AB", is_final=True)
+        s2 = State.from_bytes(b"AB", is_final=False)
+        out = State.merge(s1, s2)
+        self.assert_accepts(out, b"AB")
+
+    def test_merge_disjoint_sequences(self):
+        s1 = State.from_bytes(b"ab", is_final=True)
+        s2 = State.from_bytes(b"xy", is_final=True)
+        out = State.merge(s1, s2)
+        self.assert_accepts(out, b"ab")
+        self.assert_accepts(out, b"xy")
+        self.assert_rejects(out, b"a")
+        self.assert_rejects(out, b"x")
+        self.assert_rejects(out, b"zz")
+
+    def test_merge_revisited_neighbor_links_all_symbols(self):
+        loop_digits = State.numbers(is_final=False)
+        literal_a = State.from_bytes(b"A", is_final=True)
+        out = State.merge(loop_digits, literal_a)
+        
+        for d in b"0123456789":
+            self.assertIsNotNone(out.single_transit(d), f"{d}")
+
+        self.assert_accepts(out, b"A")
+
+    def test_merge_root_is_final_if_any_input_root_is_final(self):
+        non_final = State({}, False)
+        final = State({}, True)
+        out = State.merge(non_final, final)
+        self.assertTrue(out.is_final)
+        self.assertEqual(out.transition, {})
+
+    def test_merge_two_loops_and_literal(self):
+        digits = State.numbers(is_final=False)
+        letters = State({}, False)
+        letters.link(ord("a"), letters)
+        letters.link(ord("b"), letters)
+        letters.link(ord("!"), State({}, True))
+
+        out = State.merge(digits, letters)
+
+        self.assert_accepts(out, b"ab!")
+        self.assert_rejects(out, b"ab")
+
+        for d in b"0123456789":
+            self.assertIsNotNone(out.single_transit(d))
+
+    def test_merge_overlapping_prefixes_distinct_terminals(self):
+        left = State.from_bytes(b"car", is_final=True)
+        right = State.from_bytes(b"cat", is_final=True)
+        out = State.merge(left, right)
+
+        self.assert_accepts(out, b"car")
+        self.assert_accepts(out, b"cat")
+        self.assert_rejects(out, b"ca")
+        self.assert_rejects(out, b"cap")
+
+    def test_merge_order_invariance_for_language(self):
+        s1 = State.from_bytes(b"hi", is_final=True)
+        s2 = State.from_bytes(b"ho", is_final=True)
+        s3 = State.from_bytes(b"hey", is_final=True)
+
+        merged_a = State.merge(s1, s2, s3)
+        merged_b = State.merge(s3, s1, s2)
+
+        accepted = [b"hi", b"ho", b"hey"]
+        rejected = [b"h", b"ha", b"hez", b"hello"]
+
+        for seq in accepted:
+            self.assert_accepts(merged_a, seq)
+            self.assert_accepts(merged_b, seq)
+
+        for seq in rejected:
+            self.assert_rejects(merged_a, seq)
+            self.assert_rejects(merged_b, seq)
+    
+    
+        
+
 
 class TestParse(unittest.TestCase):
     def setUp(self) -> None:

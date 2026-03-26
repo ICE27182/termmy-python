@@ -6,11 +6,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable, Iterable, TypeVar, Generic, Generator
+from typing import Callable, Iterable, TypeVar, Generic, Generator, ClassVar
 from collections import deque
-from re import compile
-from itertools import islice, chain
-
 # from termmy.termiohub.input_event import MouseInput, KeyboardInput, InputEvent
 
 def parse(q: deque[tuple[bytes, float]], dfa: State,
@@ -166,11 +163,12 @@ class Visited(Generic[T]):
 
 @dataclass(slots=True, frozen=False)
 class State:
+    _counter: ClassVar[int] = 0
     transition: dict[int, State]
     is_final: bool
     
     def to_str(self, indentation: str = "|" + " " * 5, 
-               *, depth: int = 0, visited: Visited | None = None) -> str:
+               *, depth: int = 0, visited: Visited[State] | None = None) -> str:
         visited = Visited() if visited is None else visited
         visited.add(self)
         is_final = self.is_final
@@ -279,10 +277,8 @@ class State:
         return root
     
     @staticmethod
-    def merge(states: list[State]) -> State:
-        # BFS from the root of each state
-        # `Visited` may come in handy with creating new states
-        raise NotImplementedError
+    def merge(*states: State) -> State:
+        return _merge_states(*states)
     
     def link(self, upon: int, target: State) -> State:
         """
@@ -303,13 +299,22 @@ class State:
     
     def multi_transit(self, upon: bytes) -> State | None:
         state = self
-        print(state.to_str())
         for b in upon:
-            print(f"{b} {repr(chr(b))}")
             state = state.single_transit(b)
             if state is None:
                 return None
-            print(state.to_str())
+        return state
+    
+    def single_transit_(self, upon: int) -> State:
+        state = self.single_transit(upon)
+        if state is None:
+            raise KeyError(f"No transition for {upon}")
+        return state
+    
+    def multi_transit_(self, upon: bytes) -> State:
+        state = self
+        for b in upon:
+            state = state.single_transit_(b)
         return state
     
     def last_of_the_chain(self) -> State:
@@ -333,6 +338,16 @@ class State:
 
 
 
+################################################################
+# 
+# Helper functions
+#
+################################################################
+
+################################################################
+# State.from_constructor_list
+################################################################
+
 _CONSTRUCTOR_LIST_TYPE_ERROR = TypeError("Constructor list must only "
                                          "contain bytes objects and "
                                          "callables that take a boolean "
@@ -347,16 +362,134 @@ def _expanded_instructions(
                     case _ if callable(ins): yield ins
                     case _: raise _CONSTRUCTOR_LIST_TYPE_ERROR
 
+################################################################
+# State.merge
+################################################################
+
+type _HashableState = tuple[int | None, ...]
+type _States = tuple[State | None, ...]
+
+def _merge_states(*states: State) -> State:
+    # Yes i have given up naming stuff after fighting with this function
+    # for hours only to find that the implementation is so simple
+    #
+    # Just a simple dfs
+    #
+    # Looking at the helper functions inside. I want to inline them so much
+    # (with an inliner of course). A simple ast replacemen will already do
+    # the job since all but `dfs` are JUST expressions
+    #
+    # u know what. I think i have decided. I'm going to call them 
+    # "Just expressions", in comparison to the "pure functions" that are
+    # actually pure in a functional langauge like haskell. "Just" comes 
+    # from the type Maybe in haskell, which is a Functor, Applicative, 
+    # Monad and Alternative :)))))))
+    visited_states: Visited[State] = Visited()
+    asssignment: dict[_HashableState, State] = {}
+    visited_transitions: set[_HashableState] = set()
+    
+    def symbols_of(states: _States) -> set[int]:
+        return set().union(*(s.transition.keys() 
+                             for s in states 
+                                if s is not None))
+
+    def goodevening(states: _States) -> _HashableState:
+        return tuple(None if s is None else visited_states.get(s)
+                     for s in states)
+
+    def mercycourt(symbol: int, 
+                   states: _States) -> _HashableState:
+        return (symbol, *(goodevening(states)))
+
+    def pizza(states: _States) -> State:
+        return asssignment[goodevening(states)]
+
+    def massive_transit(symbol: int, 
+                        states: _States) -> _States:
+        return tuple(None if s is None else s.single_transit(symbol)
+                     for s in states)
+
+    def is_final(states: _States) -> bool:
+        return any(s.is_final for s in states if s is not None)
+    
+    def dfs(states: _States) -> None:
+        evening = goodevening(states)
+        
+        if evening in asssignment:
+            return
+        
+        asssignment[evening] = State({}, is_final=is_final(states))
+        
+        for symbol in symbols_of(states):
+            neighbor = massive_transit(symbol, states)
+            
+            if mercycourt(symbol, states) not in visited_transitions:
+                visited_transitions.add(mercycourt(symbol, states))
+                dfs(neighbor)
+                pizza(states).link(symbol, pizza(neighbor))
+                
+    dfs(states)
+    return pizza(states)
+
+################################################################
+# For Debugging
+################################################################
+
+def in_one_row(sep: str, *args: str, middle: bool = True, wraping_columns: int | None = None) -> str:
+    splited = [a.split('\n') for a in args]
+    height = max(map(len, splited))
+    widths = [max(map(len, a)) for a in splited]
+    
+    if wraping_columns is not None:
+        if max(widths) > wraping_columns:
+            raise ValueError("Impossible to fit the content in the given wraping columns")
+        accum = 0
+        for i, w in enumerate(widths):
+            if accum + w > wraping_columns:
+                return (in_one_row(sep, *args[:i], middle=middle) + "\n" +
+                        in_one_row(sep, *args[i:], middle=middle, wraping_columns=wraping_columns))
+            accum += w + len(sep) * (i > 0)
+            
+    if middle:
+        for i, a in enumerate(splited):
+            s = height - len(a)
+            splited[i] = [''] * (s // 2 - s % 1) + a + [''] * (s // 2)
+    else:
+        splited = [a + [''] * (height - len(a)) for a in splited]
+        
+    out = []
+    for lines in zip(*splited):
+        out.append(sep.join((s + ' ' * (w - len(s)) for s, w in zip(lines, widths))))
+    return "\n".join(out)
+
 
 if __name__ == "__main__":
-    # Debug from_constructor_list
-    mouse_move = State.from_constructor_list([
-        b"\x1b[<35;",
-        State.numbers,
-        b";",
-        State.numbers,
-        b"M",
-    ], is_final=True)
+    n = State.numbers
+    mouse_move = State.from_constructor_list([b"\x1b[<", n, b";", n, b";", n], is_final=False)
+    
+    mouse_move.multi_transit_(b"\x1b[<0;0;0").link(ord('m'), State({}, is_final=True))
+    mouse_move.multi_transit_(b"\x1b[<0;0;0").link(ord('M'), State({}, is_final=True))
+    
+    others = [
+        b"\x1bOQ",
+        b"\x1bOS",
+        b"\x1b[A",
+        b"\x1b[D",
+        b"\x1b[B",
+        b"\x1b[C",
+        b"\r",
+        b"\x15",
+        b"\x7f",
+        b"\x1b",
+        b"\r",
+        b"\x03",
+        b"\x04",
+        b"\x08",
+        b"\x01",
+        b"\x05",
+        *map(lambda x: str(x).encode(), range(10)),
+    ]
+    state = State.merge(mouse_move, *map(State.from_bytes, others))
     
     print("\n" + '-' * 99 + "\n")
     
@@ -370,8 +503,13 @@ if __name__ == "__main__":
         b"\x1b[<35;79;17M",
         b"\x1b[<35;83;17M",
         b"\x1b[<35;86;16M",
-        b"\x1b[<35;88;16M",
+        b"\x1b[<0;88;16m",
         b"\x1b[<35;89;16M",
+        *others,
     ]
     for seq in seqs:
-        assert mouse_move.multi_transit(seq) is not None
+        assert state.multi_transit(seq) is not None
+        
+    from string import ascii_lowercase
+    for seq in ascii_lowercase:
+        assert state.multi_transit(seq.encode()) is None
