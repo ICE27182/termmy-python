@@ -54,20 +54,6 @@ class TestState(unittest.TestCase):
         with self.assertRaises(ValueError):
             root.link(ord("X"), State({}, False))
 
-    def test_copy_transitions_from_and_overlap_guard(self):
-        left = State({}, False)
-        right = State({}, False)
-        target = State({}, True)
-        right.link(ord("a"), target)
-
-        left.copy_transitions_from(right)
-        self.assertIs(left.single_transit(ord("a")), target)
-
-        overlap = State({}, False)
-        overlap.link(ord("a"), State({}, False))
-        with self.assertRaises(ValueError):
-            left.copy_transitions_from(overlap)
-
     def test_from_constructor_list_mixed_bytes_and_callable(self):
         dfa = State.from_constructor_list(
             [

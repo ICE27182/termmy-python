@@ -1,14 +1,9 @@
-# TODO
-# -[x] Add a timeout on parse (necessaryin edge cases: 
-#       dfa = State.numbers(is_final=False) and q[0][0] is a number)
-# -[ ] Merge States
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Callable, Iterable, TypeVar, Generic, Generator, ClassVar
 from collections import deque
-# from termmy.termiohub.input_event import MouseInput, KeyboardInput, InputEvent
+
 
 def parse(q: deque[tuple[bytes, float]], dfa: State,
           seq_timeout: float, latency_timeout: float,
@@ -30,9 +25,39 @@ def parse(q: deque[tuple[bytes, float]], dfa: State,
             In most cases, this only applies to the ESC key.
             
         latency_timeout (float): Timeout for latency issues. All input 
-        that is received before the timeout will be discarded.
+            that is received before the timeout will be discarded.
         
         current_time (float): The current time, used for timeout calculation.
+        
+    Returns:
+        tuple[bytes, float] | None: The accepted sequence and the timestamp
+        of the first character in the sequence. If no sequence is accepted,
+        None is returned.
+
+    Behavior:
+            - If q is empty, return None.
+            - If the first byte is not recognized by dfa, return that single byte.
+            - If the first byte reaches a terminal state with no outgoing
+                transitions, return that single byte immediately.
+            - If the first byte is a prefix of a longer candidate sequence,
+                parse greedily and return the longest accepted prefix observed
+                within seq_timeout.
+            - If no accepted prefix is currently available, return None and keep
+                input bytes in q for future calls.
+
+    Queue Mutation Contract:
+            - q is consumed from the left while parsing.
+            - Any bytes not part of the returned sequence are pushed back to the
+                front of q in original order.
+            - When returning None, all bytes examined for this parse attempt are
+                restored to q.
+
+    Timeouts:
+            - seq_timeout controls ambiguity resolution for prefix states. The
+                parser waits for more bytes while a longer match is still possible.
+            - latency_timeout drops stale input: if the oldest candidate byte is
+                older than latency_timeout, that candidate is discarded and parsing
+                continues from newer input.
     """
     # There are the following cases
     # 1. The first characters is not accepted by the DFA, i.e. it is an
@@ -119,47 +144,7 @@ def parse(q: deque[tuple[bytes, float]], dfa: State,
         return parse(q, dfa, seq_timeout, latency_timeout, current_time)
     else:
         return out
-    
 
-
-T = TypeVar("T")
-
-@dataclass(slots=True, frozen=False)
-class Visited(Generic[T]):
-    visited: dict[int, int] = field(default_factory=dict)
-    counter: int = 0
-    
-    def __contains__(self, item: T) -> bool:
-        return id(item) in self.visited
-    
-    def __getitem__(self, item: T) -> int:
-        v = self.visited.get(id(item))
-        if v is None:
-            raise KeyError(item)
-        return v
-    
-    def __setitem__(self, key: T, value: int) -> None:
-        self.visited[id(key)] = value
-    
-    def get(self, item: T) -> int:
-        """Return the unique id of the item
-        A new id will be allocated if its not visited before"""
-        v = self.visited.get(id(item))
-        if v is None:
-            v = self.counter
-            self.visited[id(item)] = v
-            self.counter += 1
-        return v
-    
-    def add(self, item: T) -> None:
-        """Add the item to visited and return its unique id
-        If the item is already visited, raise KeyError"""
-        if id(item) in self.visited:
-            return
-        v = self.counter
-        self.visited[id(item)] = v
-        self.counter += 1
-    
 
 @dataclass(slots=True, frozen=False)
 class State:
@@ -168,8 +153,66 @@ class State:
     is_final: bool
     
     def to_str(self, indentation: str = "|" + " " * 5, 
-               *, depth: int = 0, visited: Visited[State] | None = None) -> str:
-        visited = Visited() if visited is None else visited
+               *, 
+               depth: int = 0, 
+               visited: _Visited[State] | None = None) -> str:
+        """
+        Return a string representation of the state and its reachable states.
+        
+        Args:
+            indentation (str): 
+                The string used for indentation. Default is "|     ".
+            depth (int): 
+                The current depth of the state in the state machine.
+            visited (Visited[State] | None): 
+                A Visited object to keep track of visited states for 
+                cycle detection.
+        
+        Example:
+            `b"ICE"` is accepted by:
+            ```
+            State 0  {
+            |     'I': State 1  {
+            |     |     'C': State 2  {
+            |     |     |     'E': State 3 Final {}
+            |     |     }
+            |     }
+            }
+            ```
+            `b"(271, 828)"` is accepted by:
+            ```
+            State 0  {
+            |     '(': State 1  {
+            |     |     '0': ... (1),
+            |     |     '1': ... (1),
+            |     |     '2': ... (1),
+            |     |     '3': ... (1),
+            |     |     '4': ... (1),
+            |     |     '5': ... (1),
+            |     |     '6': ... (1),
+            |     |     '7': ... (1),
+            |     |     '8': ... (1),
+            |     |     '9': ... (1),
+            |     |     ',': State 2  {
+            |     |     |     ' ': State 3  {
+            |     |     |     |     '0': ... (3),
+            |     |     |     |     '1': ... (3),
+            |     |     |     |     '2': ... (3),
+            |     |     |     |     '3': ... (3),
+            |     |     |     |     '4': ... (3),
+            |     |     |     |     '5': ... (3),
+            |     |     |     |     '6': ... (3),
+            |     |     |     |     '7': ... (3),
+            |     |     |     |     '8': ... (3),
+            |     |     |     |     '9': ... (3),
+            |     |     |     |     ')': State 4  {}
+            |     |     |     }
+            |     |     }
+            |     }
+            }
+            ```
+        """
+        visited = _Visited() if visited is None else visited
         visited.add(self)
         is_final = self.is_final
         indent = indentation * depth
@@ -177,13 +220,14 @@ class State:
         
         if self.transition:
             return (
-                f"State {visited[self]} {"Final" if is_final else ""} {{\n{indent_}"
+                f"State {visited[self]} {"Final" if is_final else ""} "
+                f"{{\n{indent_}"
                 + f",\n{indent_}".join(
                     f"{(repr(chr(c)))}: " + (
                         f"... ({visited[s]})"
                         if s in visited
                         else f"{s.to_str(indentation, depth = depth + 1, 
-                                         visited = visited)}"
+                                        visited = visited)}"
                     )
                     for c, s in self.transition.items()
                 )
@@ -194,6 +238,36 @@ class State:
     
     @classmethod
     def from_bytes(cls, seq: bytes, is_final: bool = True) -> State:
+        """
+        Construct a state machine with given byte sequence.
+        
+        Args:
+            seq (bytes): 
+                The byte sequence from which the state machine
+                is constructed.
+            is_final (bool): 
+                Whether the last state of the chain should be a final state.
+                Default is True. 
+                - If this is True, then the state machine will accept the 
+                given sequence
+                - If it is False, then the state machine will not accept the 
+                given sequence directly. It is useful in state machine 
+                construction.
+        
+        Example:
+            `State.from_bytes(b"ICE")` will construct a state machine that
+            accepts `b"ICE"` and has the following structure:
+            ```
+            State 0  {
+            |     'I': State 1  {
+            |     |     'C': State 2  {
+            |     |     |     'E': State 3 Final {}
+            |     |     }
+            |     }
+            }
+            ```
+        """
+        
         root = cls({}, is_final=False)
         state = root
         for b in seq:
@@ -204,6 +278,47 @@ class State:
     
     @classmethod
     def numbers(cls, is_final: bool = False) -> State:
+        """
+        Construct a state machine for any length of numbers. It is equivalent
+        to this regex `[0-9]*`.
+        
+        Args:
+            is_final (bool): Whether the state machine should accept the
+                empty sequence. Default is False. This method is typically
+                used in state machine construction.
+        Returns:
+            State: The root state of the state machine. Depending on the 
+                value of `is_final`, the output is either
+                ```
+                State 0  {
+                |     '0': ... (0),
+                |     '1': ... (0),
+                |     '2': ... (0),
+                |     '3': ... (0),
+                |     '4': ... (0),
+                |     '5': ... (0),
+                |     '6': ... (0),
+                |     '7': ... (0),
+                |     '8': ... (0),
+                |     '9': ... (0)
+                }
+                ```
+                or
+                ```
+                State 0 Final {
+                |     '0': ... (0),
+                |     '1': ... (0),
+                |     '2': ... (0),
+                |     '3': ... (0),
+                |     '4': ... (0),
+                |     '5': ... (0),
+                |     '6': ... (0),
+                |     '7': ... (0),
+                |     '8': ... (0),
+                |     '9': ... (0)
+                }
+                ```
+        """
         state = cls({}, is_final)
         for i in range(10):
             state.transition[ord(str(i))] = state
@@ -232,9 +347,49 @@ class State:
                 list, there must be at least one bytes object that indicates
                 the transition condition. This is enforced because the idea
                 is that constructor list represents a chain.
+            
+            is_final (bool): Whether the last state of the chain should be 
+                a final state. Default is False. This is useful in state 
+                machine construction.
         
         Returns:
             State: The root state of the state machine.
+        
+        Example:
+            `State.from_constructor_list([b'(', State.numbers, b', ', State.numbers, b')'])`
+            will construct a state machine that accepts inputs such as
+            `b"(271, 828)"` and has the following structure:
+            ```
+            State 0  {
+            |     '(': State 1  {
+            |     |     '0': ... (1),
+            |     |     '1': ... (1),
+            |     |     '2': ... (1),
+            |     |     '3': ... (1),
+            |     |     '4': ... (1),
+            |     |     '5': ... (1),
+            |     |     '6': ... (1),
+            |     |     '7': ... (1),
+            |     |     '8': ... (1),
+            |     |     '9': ... (1),
+            |     |     ',': State 2  {
+            |     |     |     ' ': State 3  {
+            |     |     |     |     '0': ... (3),
+            |     |     |     |     '1': ... (3),
+            |     |     |     |     '2': ... (3),
+            |     |     |     |     '3': ... (3),
+            |     |     |     |     '4': ... (3),
+            |     |     |     |     '5': ... (3),
+            |     |     |     |     '6': ... (3),
+            |     |     |     |     '7': ... (3),
+            |     |     |     |     '8': ... (3),
+            |     |     |     |     '9': ... (3),
+            |     |     |     |     ')': State 4  {}
+            |     |     |     }
+            |     |     }
+            |     }
+            }
+            ```
         """
 
         instructions = _expanded_instructions(cons_list)
@@ -278,71 +433,133 @@ class State:
     
     @staticmethod
     def merge(*states: State) -> State:
+        """
+        Merges multiple states into their union. 
+        
+        The output does not involve any references to the input states so
+        this function will not have any side effects on the input states.
+        """
         return _merge_states(*states)
     
-    def link(self, upon: int, target: State) -> State:
+    def link(self, symbol: int, target: State) -> State:
         """
         Link the target state to the current state with the given input.
         
-        It is expected (though not enforced) that `upon` is a byte value 
+        It is expected (though not enforced) that `symbol` is a byte value 
         that represent a character in the input sequence (0-127).
         
         Return the **target state** for chaining.
         """
-        if upon in self.transition:
-            raise ValueError(f"Transition for {upon} already exists")
-        self.transition[upon] = target
+        if symbol in self.transition:
+            raise ValueError(f"Transition for {symbol} already exists")
+        self.transition[symbol] = target
         return target
-            
-    def single_transit(self, upon: int) -> State | None:
-        return self.transition.get(upon)
     
-    def multi_transit(self, upon: bytes) -> State | None:
+    def last_of_the_chain(self, ignore_self_loops: bool = False) -> State:
+        """
+        Transits through the chain of states until it reaches a state where
+        there are more than one transitions or no transition at all.
+        The state will then be returned.
+        
+        Args:
+            ignore_self_loops (bool): Whether to ignore self loops when
+                determining the end of the chain.
+        """
         state = self
-        for b in upon:
+        if ignore_self_loops:
+            while True:
+                i = iter(n for n in state.transition.values() if n is not state)
+                s = next(i, None)
+                if s is None:
+                    return state # No transition or only self loop
+                elif next(i, None) is not None:
+                    return s # More than one transition
+                state = s
+        else:
+            while len(state.transition) == 1:
+                state = next(iter(state.transition.values()))
+        return state
+            
+    def single_transit(self, symbol: int) -> State | None:
+        return self.transition.get(symbol)
+    
+    def multi_transit(self, symbol: bytes) -> State | None:
+        state = self
+        for b in symbol:
             state = state.single_transit(b)
             if state is None:
                 return None
         return state
     
-    def single_transit_(self, upon: int) -> State:
-        state = self.single_transit(upon)
+    def single_transit_(self, symbol: int) -> State:
+        """
+        Raises:
+            KeyError: If there is no transition for the given symbol.
+        """
+        state = self.single_transit(symbol)
         if state is None:
-            raise KeyError(f"No transition for {upon}")
+            raise KeyError(f"No transition for {symbol}")
         return state
     
-    def multi_transit_(self, upon: bytes) -> State:
+    def multi_transit_(self, symbol: bytes) -> State:
+        """
+        Raises:
+            KeyError: If there is no transition for the given symbol.
+        """
         state = self
-        for b in upon:
+        for b in symbol:
             state = state.single_transit_(b)
         return state
     
-    def last_of_the_chain(self) -> State:
-        state = self
-        while len(state.transition) == 1:
-            state = next(iter(state.transition.values()))
-        return state
     
-    def copy_transitions_from(self, state: State) -> None:
-        """
-        Copy transitions from another state.
-        
-        Note that it is not a deep copy so after they copy, 
-        `self` and `state` can transit to the same state object
-        upon the same input.
-        """
-        if self.transition.keys() & state.transition.keys():
-            raise ValueError("Cannot copy transitions from a state that has "
-                             "overlapping transition keys")
-        self.transition.update(state.transition)
-
-
 
 ################################################################
 # 
-# Helper functions
+# Helper functions & Classes
 #
 ################################################################
+
+################################################################
+# runtime-id-based-hashable dict with unique 0-based id allocation
+################################################################
+
+T = TypeVar("T")
+
+@dataclass(slots=True, frozen=False)
+class _Visited(Generic[T]):
+    visited: dict[int, int] = field(default_factory=dict)
+    counter: int = 0
+    
+    def __contains__(self, item: T) -> bool:
+        return id(item) in self.visited
+    
+    def __getitem__(self, item: T) -> int:
+        v = self.visited.get(id(item))
+        if v is None:
+            raise KeyError(item)
+        return v
+    
+    def __setitem__(self, key: T, value: int) -> None:
+        self.visited[id(key)] = value
+    
+    def get(self, item: T) -> int:
+        """Return the unique id of the item
+        A new id will be allocated if its not visited before"""
+        v = self.visited.get(id(item))
+        if v is None:
+            v = self.counter
+            self.visited[id(item)] = v
+            self.counter += 1
+        return v
+    
+    def add(self, item: T) -> None:
+        """Add the item to visited and return its unique id
+        If the item is already visited, raise KeyError"""
+        if id(item) in self.visited:
+            return
+        v = self.counter
+        self.visited[id(item)] = v
+        self.counter += 1
 
 ################################################################
 # State.from_constructor_list
@@ -384,7 +601,7 @@ def _merge_states(*states: State) -> State:
     # actually pure in a functional langauge like haskell. "Just" comes 
     # from the type Maybe in haskell, which is a Functor, Applicative, 
     # Monad and Alternative :)))))))
-    visited_states: Visited[State] = Visited()
+    visited_states: _Visited[State] = _Visited()
     asssignment: dict[_HashableState, State] = {}
     visited_transitions: set[_HashableState] = set()
     
