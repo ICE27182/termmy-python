@@ -1,4 +1,4 @@
-from sys import platform, stdin, stdout
+from sys import stdin, stdout
 import os
 from typing import Self
 
@@ -87,7 +87,7 @@ if os.name == "nt": # Windows
 
 
 else: # POSIX
-    import tty, termios, sys
+    import tty, termios
 
     class _TermModeContextManager:
         _fd: int
