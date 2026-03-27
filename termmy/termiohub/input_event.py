@@ -6,7 +6,13 @@ from re import compile, Pattern
 
 @dataclass(slots=True, frozen=True)
 class KeyboardInput:
+    """
+    Represents a Keyboard input. 
+    
+    Modifier keys can be in three states: YES, NO, or UNKNOWN.
+    """
     class ModifierState(StrEnum):
+        """3 Modifier possibilities: YES, NO, UNKNOWN."""
         YES = auto()
         NO = auto()
         UNKNOWN = auto()
@@ -45,11 +51,24 @@ class KeyboardInput:
 
 @dataclass(slots=True, frozen=True)
 class MouseInput:
+    """Represents a mouse input.
+
+    This model follows xterm-style mouse reporting and stores button state,
+    movement/wheel flags, modifier flags, pointer position, and raw bytes.
+    Use `from_raw` to parse CSI mouse sequences into a `MouseInput`.
+    
+    `release` is True iff the key is released in this event. If it is False,
+    it is still possible that the key is not pressed.
+    """
     class Button(StrEnum):
+        """
+        4 mouse button possibilities: LEFT, RIGHT, MIDDLE, NONE.
+        """
         LEFT = auto()
         RIGHT = auto()
         MIDDLE = auto()
         NONE = auto()
+        
         @classmethod
         def from_state(cls, state: int) -> MouseInput.Button:
             if state >= 64 or state & 0b11 == 3:
@@ -151,6 +170,9 @@ class MouseInput:
 
 @dataclass(slots=True, frozen=True)
 class InputEvent:
+    """
+    Timestamped union of keyboard or mouse input.
+    """
     input: KeyboardInput | MouseInput
     timestamp: float
     

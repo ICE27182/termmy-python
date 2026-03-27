@@ -8,6 +8,10 @@ _F = KeyboardInput.ModifierState.NO
 _U = KeyboardInput.ModifierState.UNKNOWN
 
 class PredefinedKeys(Enum):
+    """Collection of predefined keyboard inputs."""
+    
+    # Blow I used a few `if True:` in order to fold them as groups in vscode
+    
     ################################################################
     # Directions
     ################################################################

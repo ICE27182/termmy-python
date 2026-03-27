@@ -148,7 +148,16 @@ def parse(q: deque[tuple[bytes, float]], dfa: State,
 
 @dataclass(slots=True, frozen=False)
 class State:
-    _counter: ClassVar[int] = 0
+    """
+    Represents a state in the deterministic finite automaton (DFA).
+    
+    Used in input parsing
+    
+    Attributes:
+        transition (dict[int, State]): A mapping from input byte (0-255) to the next state.
+        is_final (bool): Whether this state is a final (accepting) state.
+    """
+    
     transition: dict[int, State]
     is_final: bool
     
