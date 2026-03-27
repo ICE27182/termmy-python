@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from basics import Vertex, Color, RasterizationTriangle, Buffer
-from rectangle import Rectangle
+from gadgets.geometries.geometry_rectangle import Rectangle
 
 @dataclass(slots=True, frozen=False)
 class Line:
