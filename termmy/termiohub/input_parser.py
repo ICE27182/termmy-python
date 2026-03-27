@@ -431,6 +431,13 @@ class State:
         last_state.is_final = is_final
         return root
     
+    @classmethod
+    def accepts(cls, accepted: Iterable[bytes]) -> State:
+        """
+        Construct a state machine that accepts all the given byte sequences.
+        """
+        return State.merge(*(cls.from_bytes(seq) for seq in accepted))
+    
     @staticmethod
     def merge(*states: State) -> State:
         """
