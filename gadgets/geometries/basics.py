@@ -6,7 +6,7 @@ from typing import Final
 
 from linear_algebra import *
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=False)
 class Transform:
     mat4: Matrix4dTuple
     
@@ -64,6 +64,10 @@ class Vertex:
     y: float
     u: float
     v: float
+    
+    @classmethod
+    def zero(cls) -> Vertex:
+        return cls(0.0, 0.0, 0.0, 0.0)
 
 
 @dataclass(slots=True, frozen=False)
