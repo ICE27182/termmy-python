@@ -8,6 +8,8 @@ from basics import Vertex, Color, RasterizationTriangle, Buffer
 
 @dataclass(slots=True, frozen=True)
 class PixelLine:
-    start: Vertex
-    end: Vertex
+    start_x: float
+    start_y: float
+    end_x: float
+    end_y: float
     color: Color
