@@ -2,12 +2,12 @@
 
 from .color import Color
 
-# FIXME tuple[Color] Color is mutable. Unsafe globals. Use a function/method
+# FIXME tuple[Color, ...] Color is mutable. Unsafe globals. Use a function/method
 # to return them.
 
 # https://en.wikipedia.org/wiki/ANSI_escape_code
 # Average of the following 5 color configs
-DEFAULT_ANSI_4BIT_RGB:tuple[Color] = (
+DEFAULT_ANSI_4BIT_RGB:tuple[Color, ...] = (
     Color(2/255, 2/255, 2/255), Color(196/255, 24/255, 24/255), 
     Color(17/255, 180/255, 41/255), Color(207/255, 188/255, 4/255), 
     Color(7/255, 56/255, 203/255), Color(165/255, 24/255, 167/255), 
@@ -17,7 +17,7 @@ DEFAULT_ANSI_4BIT_RGB:tuple[Color] = (
     Color(60/255, 89/255, 250/255), Color(226/255, 22/255, 222/255), 
     Color(27/255, 227/255, 234/255), Color(242/255, 242/255, 242/255),
 )
-ANSI_4BIT_RGB_VSCODE:tuple[Color] = (
+ANSI_4BIT_RGB_VSCODE:tuple[Color, ...] = (
     Color(0/255, 0/255, 0/255), Color(205/255, 49/255, 49/255), 
     Color(13/255, 188/255, 121/255), Color(229/255, 229/255, 16/255), 
     Color(36/255, 114/255, 200/255), Color(188/255, 63/255, 188/255), 
@@ -27,7 +27,7 @@ ANSI_4BIT_RGB_VSCODE:tuple[Color] = (
     Color(59/255, 142/255, 234/255), Color(214/255, 112/255, 214/255), 
     Color(41/255, 184/255, 219/255), Color(229/255, 229/255, 229/255)
 )
-ANSI_4BIT_RGB_WIN_CAMPELL_THEME:tuple[Color] = (
+ANSI_4BIT_RGB_WIN_CAMPELL_THEME:tuple[Color, ...] = (
     Color(12/255, 12/255, 12/255), Color(197/255, 15/255, 31/255), 
     Color(19/255, 161/255, 14/255), Color(193/255, 156/255, 0/255), 
     Color(0/255, 55/255, 218/255), Color(136/255, 23/255, 152/255), 
@@ -37,7 +37,7 @@ ANSI_4BIT_RGB_WIN_CAMPELL_THEME:tuple[Color] = (
     Color(59/255, 120/255, 255/255), Color(180/255, 0/255, 158/255), 
     Color(97/255, 214/255, 214/255), Color(242/255, 242/255, 242/255)
 )
-ANSI_4BIT_RGB_TERMINAL_APP:tuple[Color] = (
+ANSI_4BIT_RGB_TERMINAL_APP:tuple[Color, ...] = (
     Color(0/255, 0/255, 0/255), Color(153/255, 0/255, 0/255), 
     Color(0/255, 166/255, 0/255), Color(153/255, 153/255, 0/255), 
     Color(0/255, 0/255, 178/255), Color(178/255, 0/255, 178/255), 
@@ -47,7 +47,7 @@ ANSI_4BIT_RGB_TERMINAL_APP:tuple[Color] = (
     Color(0/255, 0/255, 255/255), Color(230/255, 0/255, 230/255), 
     Color(0/255, 230/255, 230/255), Color(230/255, 230/255, 230/255)
 )
-ANSI_4BIT_RGB_XTERM:tuple[Color] = (
+ANSI_4BIT_RGB_XTERM:tuple[Color, ...] = (
     Color(0/255, 0/255, 0/255), Color(205/255, 0/255, 0/255), 
     Color(0/255, 205/255, 0/255), Color(205/255, 205/255, 0/255), 
     Color(0/255, 0/255, 238/255), Color(205/255, 0/255, 205/255), 
@@ -57,7 +57,7 @@ ANSI_4BIT_RGB_XTERM:tuple[Color] = (
     Color(92/255, 92/255, 255/255), Color(255/255, 0/255, 255/255), 
     Color(0/255, 255/255, 255/255), Color(255/255, 255/255, 255/255)
 )
-ANSI_4BIT_RGB_UBUNTU:tuple[Color] = (
+ANSI_4BIT_RGB_UBUNTU:tuple[Color, ...] = (
     Color(1/255, 1/255, 1/255), Color(222/255, 56/255, 43/255), 
     Color(57/255, 181/255, 74/255), Color(255/255, 199/255, 6/255), 
     Color(0/255, 111/255, 184/255), Color(118/255, 38/255, 113/255), 
@@ -68,7 +68,7 @@ ANSI_4BIT_RGB_UBUNTU:tuple[Color] = (
     Color(0/255, 255/255, 255/255), Color(255/255, 255/255, 255/255)
 )
 
-DEFAULT_ANSI_8BIT_RGB:tuple[Color] = (
+DEFAULT_ANSI_8BIT_RGB:tuple[Color, ...] = (
     Color(0/255, 0/255, 0/255), Color(128/255, 0/255, 0/255), 
     Color(0/255, 128/255, 0/255), Color(128/255, 128/255, 0/255), 
     Color(0/255, 0/255, 128/255), Color(128/255, 0/255, 128/255), 
