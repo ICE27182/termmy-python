@@ -175,3 +175,14 @@ class Transform:
             identity_mat4t(),
             self.scale_vec
         )
+        
+    ###############################################################
+    # Others
+    ###############################################################
+    
+    def copy(self) -> Transform:
+        """Returns a deep copy of the transform."""
+        t, s = self.translation_vec, self.scale_vec
+        return Transform(Vec3f(t.x, t.y, t.z), 
+                         self.rotation_mat, 
+                         Vec3f(s.x, s.y, s.z))

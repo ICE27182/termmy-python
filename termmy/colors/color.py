@@ -1,8 +1,16 @@
-
-
 from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Self, Callable
+
+def alpha_blended(new: Color, old: Color) -> tuple[float, float, float]:
+    a = new.a
+    a_ = 1.0 - a
+    return (
+        old.r*a_ + new.r*a,
+        old.g*a_ + new.g*a,
+        old.b*a_ + new.b*a,
+    )
 
 @dataclass(slots=True)
 class Color:
