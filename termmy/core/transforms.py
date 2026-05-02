@@ -15,10 +15,10 @@ class LinearTransform(Protocol):
     A protocol for linear transforms in the form of a 4x4 matrix.
     
     Methods:
-        get_mat() -> Matrix4dTuple: 
+        get_matrix() -> Matrix4dTuple: 
             Returns the 4x4 matrix representation of the linear transform.
     """
-    def get_mat(self) -> Matrix4dTuple: ...
+    def get_matrix(self) -> Matrix4dTuple: ...
     
 
 @dataclass(slots=True, frozen=False)
@@ -32,7 +32,7 @@ class Transform:
     rotation_mat: Matrix4dTuple
     scale_vec: Vec3f
     
-    def get_mat(self) -> Matrix4dTuple:
+    def get_matrix(self) -> Matrix4dTuple:
         (r11, r12, r13, _,
          r21, r22, r23, _,
          r31, r32, r33, _,
