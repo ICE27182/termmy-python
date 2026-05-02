@@ -219,7 +219,19 @@ def scaling(v: Vector4dTuple) -> Matrix4dTuple:
         0.0, v1, 0.0, 0.0,
         0.0, 0.0, v2, 0.0,
         0.0, 0.0, 0.0, v3,
-    )s
+    )
+    
+###############################################################
+# Identity
+###############################################################
+
+def identity_mat4t() -> Matrix4dTuple:
+    return (
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0,
+    )
 
 def add_translation_to_mat4t(v: Vector4dTuple, m: Matrix4dTuple) -> Matrix4dTuple:
     v0, v1, v2, _ = v
@@ -233,3 +245,5 @@ def add_translation_to_mat4t(v: Vector4dTuple, m: Matrix4dTuple) -> Matrix4dTupl
         m20, m21, m22, m23 + v2,
         m30, m31, m32, m33,
     )
+
+

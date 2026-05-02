@@ -1,5 +1,5 @@
 from .type_aliases import AbsoFloat, NormFloat
-from .vec2 import Vec2i, Vec2, UV, Vec2Rela
+from .vec import Vec2i, Vec2, UV, Vec2Rela
 from .vec3 import Vec3
 from .matrix import Matrix
 from .matrix2x2 import Mat2
