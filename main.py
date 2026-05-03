@@ -1,4 +1,5 @@
 from time import sleep, time
+from shutil import get_terminal_size
 
 from termmy.termiohub import TermIOHub, constants
 from termmy.termiohub import InputEvent, KeyboardInput, MouseInput
@@ -7,13 +8,15 @@ from termmy.buffers.color_buffer import ansi24_4x, ansi24
 from termmy.render_objects.shapes import *
 from termmy.colors import Colors
 from termmy.core import Transform
+from termmy.rendering.basic_rendering_functions import rasterize_pixel_point
 
-SUPER = True
+SUPER = False
 
 WIDTH, HEIGHT = 80, 48
+WIDTH, HEIGHT = get_terminal_size()
+WIDTH //= 2
 if SUPER: WIDTH, HEIGHT = WIDTH * 2, HEIGHT * 2
-clrbuf = ColorBuffer(WIDTH, HEIGHT)
-fb = FrameBuffer(color_buffer=clrbuf)
+fb = FrameBuffer.from_size(WIDTH, HEIGHT)
 
 oval = Circle(
     WIDTH / 8, 
@@ -26,17 +29,24 @@ pline = PixelLine(
     0.0, 0.0, 23.0, 23.0, Colors.gray(),
 )
 
+point = (0.0, 0.0)
+
 
 with TermIOHub() as iohub:
     def print(arg, end=''): iohub.output(arg)
 # if True:
     print('\r\n', end='')
+    SHOW_INPUT = 25
+    show_input = SHOW_INPUT
+    input = ''
     while True:
         
         fb.color_buffer.fill()
+        fb.entity_buffer.clear()
         
         oval.render(fb)
         pline.render(fb)
+        rasterize_pixel_point(*point, Colors.red(), fb.color_buffer)
         oval.transform.rotate_z_by(0.02)
         
         if SUPER:
@@ -54,7 +64,11 @@ with TermIOHub() as iohub:
                     print(f"\033[{HEIGHT+6}B\r\n", end='')
                     break
             elif isinstance(input, MouseInput):
-                x, y = input.x, input.y
+                if input.button == MouseInput.Button.LEFT:
+                    x, y = input.x / 2, input.y
+                    # if fb.entity_buffer.get_entity(int(x), y) is oval: # TODO update the pixel shader
+                    oval.transform.translate_to(x, y, 0.0)
+                    point = (x, y)
         
         print(f"\033[{HEIGHT // 2 if SUPER else HEIGHT}A", end='')
         sleep(1 / 60)
