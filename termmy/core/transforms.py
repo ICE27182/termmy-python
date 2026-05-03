@@ -39,9 +39,9 @@ class Transform:
          _, _, _, _) = self.rotation_mat
         s, t = self.scale_vec, self.translation_vec
         return (
-            s.x * r11, s.x * r12, s.x * r13, t.x,
-            s.y * r21, s.y * r22, s.y * r23, t.y,
-            s.z * r31, s.z * r32, s.z * r33, t.z,
+            s.x * r11, s.y * r12, s.z * r13, t.x,
+            s.x * r21, s.y * r22, s.z * r23, t.y,
+            s.x * r31, s.y * r32, s.z * r33, t.z,
             0.0, 0.0, 0.0, 1.0
         )
     
@@ -50,7 +50,7 @@ class Transform:
     ###############################################################
     @classmethod
     def identity(cls) -> Transform:
-        return cls(Vec3f.one(), identity_mat4t(), Vec3f.zero())
+        return cls(Vec3f.zero(), identity_mat4t(), Vec3f.one())
     
     @classmethod
     def translation(cls, x: float, y: float, z: float) -> Transform:
