@@ -133,9 +133,10 @@ class ColorBuffer:
         return ansi24(self.width, self.height, self.data)
 
 
-def ansi24(width: int, height: int, data: Iterable[Color]) -> str:
+
+def ansi24(width: int, height: int, data: tuple[Color, ...]) -> str:
     return (
-        f"{"\033[0m\n".join(
+        f"{"\033[0m\r\n".join(
             "".join(
                     "\033[48;2;%d;%d;%dm  " % (round(color.r*255.0),
                                                round(color.g*255.0),
@@ -146,12 +147,13 @@ def ansi24(width: int, height: int, data: Iterable[Color]) -> str:
         )}\033[0m"
     )
 
-def ansi24_4x(width: int, height: int, data: Iterable[Color]) -> str:
+
+def ansi24_4x(width: int, height: int, data: tuple[Color, ...]) -> str:
     return (
-        f"{"\033[0m\n".join(
+        f"{"\033[0m\r\n".join(
             "".join(
                     "\033[38;2;%d;%d;%dm"
-                    "\033[48;2;%d;%d;%dm▄" % (round(ct.r*255.0),
+                    "\033[48;2;%d;%d;%dm▀" % (round(ct.r*255.0),
                                                 round(ct.g*255.0),
                                                 round(ct.b*255.0),
                                                 round(cb.r*255.0),
