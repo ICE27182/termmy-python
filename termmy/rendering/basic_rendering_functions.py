@@ -2,25 +2,27 @@ from typing import Callable
 from math import ceil
 
 from termmy.colors.color import alpha_blended, Color
-from termmy.buffers.framebuffer import hasColorBuffer
-from termmy.buffers.color_buffer import ColorBuffer
+from termmy.buffers import FrameBuffer, ColorBuffer, EntityBuffer
 from termmy.render_objects.triangulatable import Triangulatable
 from termmy.render_objects.rasterization import RasterizationTriangle
 
 
-def render(frame_buffer: hasColorBuffer, render_object: Triangulatable) -> None:
+def render(frame_buffer: FrameBuffer, render_object: Triangulatable) -> None:
     for triangle in render_object.triangulate():
-        rasterize_triangle(frame_buffer.color_buffer, triangle, triangle.texture, pixel_shader)
+        rasterize_triangle(frame_buffer, triangle, triangle.texture, pixel_shader, render_object)
         # rasterize_pixel_line(triangle.a.x, triangle.a.y, triangle.b.x, triangle.b.y, Color(0.0, 0.0, 0.0), frame_buffer.color_buffer)
         # rasterize_pixel_line(triangle.b.x, triangle.b.y, triangle.c.x, triangle.c.y, Color(0.0, 0.0, 0.0), frame_buffer.color_buffer)
         # rasterize_pixel_line(triangle.c.x, triangle.c.y, triangle.a.x, triangle.a.y, Color(0.0, 0.0, 0.0), frame_buffer.color_buffer)
         
         
-def rasterize_triangle(color_buffer: ColorBuffer, 
+def rasterize_triangle(frame_buffer: FrameBuffer, 
                        triangle: RasterizationTriangle,
                        texture: ColorBuffer,
-                       pixel_shader: Callable) -> None:
+                       pixel_shader: Callable,
+                       render_object: Triangulatable) -> None:
     # Localize data
+    color_buffer = frame_buffer.color_buffer
+    entity_buffer = frame_buffer.entity_buffer
     txtr_w, txtr_h = texture.width, texture.height - 1
     a, b, c = triangle.a, triangle.b, triangle.c
     
@@ -52,8 +54,8 @@ def rasterize_triangle(color_buffer: ColorBuffer,
             bx, by, bu, bv,
             ax, ay, au, av,
             t_ac, mx, du_ac, dv_ac,
-            color_buffer, texture,
-            pixel_shader,
+            color_buffer, entity_buffer,
+            texture, pixel_shader, render_object,
         )
             
     if by != cy:
@@ -62,8 +64,8 @@ def rasterize_triangle(color_buffer: ColorBuffer,
             bx, by, bu, bv,
             cx, cy, cu, cv,
             t_ac, mx, du_ac, dv_ac,
-            color_buffer, texture,
-            pixel_shader,
+            color_buffer, entity_buffer,
+            texture, pixel_shader, render_object,
         )      
 
 
@@ -71,8 +73,9 @@ def _rasterize_flat_triangle(
     bx: float, by: float, bu: float, bv: float,
     vx: float, vy: float, vu: float, vv: float,
     t_m: float, mx: float, du_m: float, dv_m: float,
-    buffer: ColorBuffer, texture: ColorBuffer,
-    pixel_shader: Callable,
+    buffer: ColorBuffer, entity_buffer: EntityBuffer,
+    texture: ColorBuffer, pixel_shader: Callable,
+    render_object: Triangulatable,
 ):
     txtr_w, txtr_h_ = texture.width, texture.height - 1
     buff_w, buff_h = buffer.width, buffer.height
@@ -125,6 +128,7 @@ def _rasterize_flat_triangle(
                           (int(v) % txtr_h_ if txtr_h_ > 0 else 0))
                 
                 pixel_shader(x, clrbuf_row_idx, buff, u_, v_, txtr_w, txtr)
+                entity_buffer._data[clrbuf_row_idx + x] = render_object
 
                 # print(buffer.ansi_24(), end="")
                 # print(buffer.rollback_str(), end="")

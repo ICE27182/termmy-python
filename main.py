@@ -66,8 +66,8 @@ with TermIOHub() as iohub:
             elif isinstance(input, MouseInput):
                 if input.button == MouseInput.Button.LEFT:
                     x, y = input.x / 2, input.y
-                    # if fb.entity_buffer.get_entity(int(x), y) is oval: # TODO update the pixel shader
-                    oval.transform.translate_to(x, y, 0.0)
+                    if fb.entity_buffer.get_entity(int(x), y) is oval:
+                        oval.transform.translate_to(x, y, 0.0)
                     point = (x, y)
         
         print(f"\033[{HEIGHT // 2 if SUPER else HEIGHT}A", end='')

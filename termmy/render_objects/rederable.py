@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from buffers.framebuffer import FrameBuffer, hasColorBuffer
+from termmy.buffers.framebuffer import FrameBuffer
 
 class Renderable(Protocol):
     """

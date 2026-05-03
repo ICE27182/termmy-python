@@ -1,10 +1,10 @@
-from typing import Protocol
-
 from termmy.buffers.framebuffer import FrameBuffer, hasColorBuffer
 from termmy.render_objects.rasterization import RasterizationTriangle
+
+from .rederable import Renderable
     
 
-class Triangulatable(Protocol):
+class Triangulatable(Renderable):
     """
     A protocol for objects that can be triangulated.
     
