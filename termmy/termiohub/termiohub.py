@@ -114,7 +114,7 @@ class TermIOHub(_TermEnv):
         TermIOHub._active_instance = self
         
         super().__enter__()
-        
+        print("\033[?12l", end="")
         if self.read_input:
             self._input_thread.start()
         if self.concurrent_output:
@@ -129,6 +129,7 @@ class TermIOHub(_TermEnv):
             self.output(self.exit_prompt)
             self._input_thread.join()
         
+        print("\033[?12h", end="")
         super().__exit__(exc_type, exc_val, exc_tb)
         
         TermIOHub._active_instance = None
