@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from threading import Thread, RLock, Event
 from collections import deque
-from typing import Self, ClassVar, override
+from typing import Self, ClassVar, override, Callable
 from dataclasses import dataclass, field
 from queue import Queue
 from time import monotonic
@@ -20,8 +20,12 @@ else:
 
 from .input_parser import parse
 from .input_event import InputEvent
-from .constants import DFA, KEY_MAPPING
+from .input_parser import State
+from .constants import get_default_dfa, _KEY_MAPPING
 
+_DEFAULT_DFA = get_default_dfa()
+"""This should not be mutated. If you want to use the default DFA, 
+call `get_default_dfa()` instead."""
 
 # It appears the static analyzer may have some trouble understanding _TermEnv
 # It is not a problem in the runtime. Thus the type ignore
@@ -64,7 +68,9 @@ class TermIOHub(_TermEnv):
         read_input: Whether to start the input thread and allow `get_input()`.
         exit_prompt: Prompt written during shutdown when `read_input` is
             enabled. Use `""` to disable.
-        concurrent_output: Whether `output()` writes through a dedicated
+        concurrent_output: An experimental feature. Set this to False if the 
+            output performance is undesirable.
+            It determines whether `output` writes through a dedicated
             output thread (thread-safe producer/consumer queue) instead of
             writing directly to stdout. This can potentially improve the IO
             performance when the output string is very large (e.g. a frame).
@@ -72,6 +78,11 @@ class TermIOHub(_TermEnv):
     Raises:
         RuntimeError: If the context manager is nested (that is, another
             `TermIOHub` instance is already active).
+            
+    Methods:
+        get_input: Get the keyboard/mouse input as parsed `InputEvent` values.
+        output: Write a (large) string to stdout. Similar to 
+            `print(string, end="")`.
     """
     
     _active_instance: ClassVar[None | TermIOHub] = None
@@ -79,7 +90,7 @@ class TermIOHub(_TermEnv):
     read_input: bool = True
     exit_prompt: str = "Provide any input to exit...\n\r"
     
-    concurrent_output: bool = True
+    concurrent_output: bool = False
     
     
     _stop: Event = field(kw_only=True, default_factory=Event)
@@ -92,7 +103,7 @@ class TermIOHub(_TermEnv):
     
     _output_thread: Thread = field(init=False)
     # Multiple producers, one consumer
-    _outputs: Queue[str] = field(kw_only=True, default_factory=Queue)
+    _outputs: Queue[str | None] = field(kw_only=True, default_factory=Queue)
     
     def __post_init__(self):
         object.__setattr__(
@@ -127,6 +138,7 @@ class TermIOHub(_TermEnv):
         if self.read_input:
             self._stop.set()
             self.output(self.exit_prompt)
+            self._outputs.put(None)
             self._input_thread.join()
         
         print("\033[?12h", end="")
@@ -134,9 +146,14 @@ class TermIOHub(_TermEnv):
         
         TermIOHub._active_instance = None
 
-    def get_input(self, max_latency: float = 0.5, 
-                  sequence_timeout: float = 0.05, 
-                  current_time: float | None = None) -> InputEvent | None:
+    def get_input(
+        self, 
+        max_latency: float = 0.5, 
+        sequence_timeout: float = 0.05, 
+        current_time: float | None = None,
+        dfa: State | None = None,
+        event_creator: Callable[[bytes, float], InputEvent] | None = None,
+    ) -> InputEvent | None:
         """
         Parse the input q with the given DFA. q may be mutated (via popleft).
     
@@ -158,6 +175,26 @@ class TermIOHub(_TermEnv):
                 for timeout calculation. 
                 If it is None, the time will be obtained with 
                 `time.monotonic()`.
+                
+            dfa (State | None): The DFA to be used for parsing. 
+                The default DFA will be used if this is left as None. 
+                The default one should be sufficient for most use cases.
+                If you want to customize/extend the control sequence 
+                interpretation, you can construct a DFA with all the 
+                sequences that can be accepted. Such DFA can be constructed
+                from `get_default_keyboard_dfa`, `get_default_mouse_dfa`, 
+                and `get_default_dfa`.
+                
+            event_creator (Callable[[bytes, float], InputEvent] | None):
+                The default event creator will be used if this is left 
+                as None. The default one uses the `PredefinedKeys` and 
+                `InputEvent.from_raw` should be sufficient and should be
+                used with the default dfa.
+                If you want to customize/extend the control sequence 
+                interpretation, the function will be called with the raw
+                bytes and timestamp of the parsed input, and should return
+                an `InputEvent` object. The default implementation may no 
+                longer be sufficient with customization.
             
         Returns:
             InputEvent | None: The parsed input event or None if no valid 
@@ -177,17 +214,20 @@ class TermIOHub(_TermEnv):
         - Stale input is dropped when the event timestamp is older than
             `max_latency` relative to `current_time`.
         """
-        
         self._check()
+        dfa = _DEFAULT_DFA if dfa is None else dfa
         current_time = monotonic() if current_time is None else current_time
         with self._inputs_lock:
-            parsed = parse(self._inputs, DFA, sequence_timeout, 
+            parsed = parse(self._inputs, dfa, sequence_timeout, 
                            max_latency, current_time)
             if not parsed:
                 return None
-            return InputEvent.from_raw(*parsed, KEY_MAPPING)
+            elif event_creator is None:
+                return InputEvent.from_raw(*parsed, _KEY_MAPPING)
+            else:
+                return event_creator(*parsed)
         
-    def output(self, value: str) -> None:
+    def output(self, string: str) -> None:
         """
         Write text to stdout.
 
@@ -199,9 +239,9 @@ class TermIOHub(_TermEnv):
         """
         self._check()
         if self.concurrent_output:
-            self._outputs.put(value)
+            self._outputs.put(string)
         else:
-            stdout.write(value)
+            stdout.write(string)
             stdout.flush()
     
     def _check(self) -> None:

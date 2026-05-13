@@ -7,9 +7,29 @@ from re import compile, Pattern
 @dataclass(slots=True, frozen=True)
 class KeyboardInput:
     """
-    Represents a Keyboard input. 
+    A KeyboardInput object contains the name of the key, the raw bytes read
+    from the terminal, and the modifier states. It also has an enum class
+    `ModifierState` to represent the state of modifier keys.
     
     Modifier keys can be in three states: YES, NO, or UNKNOWN.
+    
+    Note that key strikes such as shift and ctrl are defined as modifiers,
+    rather than separate key inputs. This is because we interpret the input
+    based on the control sequences read from the terminal, and no control
+    sequence is sent for these modifier keys alone. We can only infer 
+    whether they are pressed based on the raw sequence.
+    
+    Attributes:
+        key (str): The name assigned to the key input.
+        raw (bytes): The raw byte sequence that was input. It is more like 
+            the unique identifier for the key input.
+        shift (KeyboardInput.ModifierState): The state of the Shift key.
+        ctrl (KeyboardInput.ModifierState): The state of the Control key.
+        alt (KeyboardInput.ModifierState): The state of the Alt key.
+        control (KeyboardInput.ModifierState):
+            Alias for ctrl implemented as a property.
+        option (KeyboardInput.ModifierState):
+            Alias for alt implemented as a property.
     """
     class ModifierState(StrEnum):
         """3 Modifier possibilities: YES, NO, UNKNOWN."""
@@ -51,14 +71,59 @@ class KeyboardInput:
 
 @dataclass(slots=True, frozen=True)
 class MouseInput:
-    """Represents a mouse input.
-
-    This model follows xterm-style mouse reporting and stores button state,
-    movement/wheel flags, modifier flags, pointer position, and raw bytes.
-    Use `from_raw` to parse CSI mouse sequences into a `MouseInput`.
+    """A MouseInput object contains the button state, cursor position,
+    movement/wheel flags, modifier flags and the raw control sequence bytes.
+    In addition, it as a nested enum class `Button` to represent the mouse 
+    button involved in the event.
     
-    `release` is True iff the key is released in this event. If it is False,
-    it is still possible that the key is not pressed.
+    The `MouseInput.Button` enum class has four members: `LEFT`, `RIGHT`, 
+    `MIDDLE`, and `NONE`.
+    
+    Note that key strikes such as shift and ctrl are defined as modifiers,
+    rather than separate key inputs. This is because we interpret the input
+    based on the control sequences read from the terminal, and no control
+    sequence is sent for these modifier keys alone. We can only infer 
+    whether they are pressed based on the raw sequence.
+    
+    Unlike `KeyboardInput`, the type for the modifier keys here is just
+    `bool` instead of `ModifierState`. This is because in mouse input 
+    parsing, there is no ambiguity in determining whether a modifier key
+    is pressed. We know for sure whether a modifier key is pressed based 
+    on the raw sequence, and thus there is no "UNKNOWN" state.
+    
+    Attributes:
+        raw (bytes): The raw byte sequence that was input. It is more like 
+            the unique identifier for the mouse input.
+            
+        x (int): The column position of the cursor, 1-indexed.
+        
+        y (int): The row position of the cursor, 1-indexed.
+        
+        button (MouseInput.Button): The button involved in the event.
+        
+        wheel_up (bool): Whether the scroll wheel is scrolling up
+        
+        wheel_down (bool): Whether the scroll wheel is scrolling down
+        
+        release (bool): Whether the button was released in this event. 
+            Note that `release` is True iff the key is released in this event.
+            If it is False, it is still possible that the key is not pressed.
+            It's just that it might have been released previously.
+            
+        moving (bool): Whether the cursor is moving in this event. 
+            Note that if the cursor moves very little such that it still 
+            points to same character cell of the terminal, `moving` can 
+            be False
+            
+        shift (bool): Whether the Shift key is pressed
+        
+        ctrl (bool): Whether the Control key is pressed
+        
+        alt (bool): Whether the Alt key is pressed
+        
+        control (bool): Alias for ctrl implemented as a property.
+        
+        option (bool): Alias for alt implemented as a property.
     """
     class Button(StrEnum):
         """
@@ -82,23 +147,21 @@ class MouseInput:
                 return cls.MIDDLE
             else:
                 return cls.NONE
+    raw: bytes
 
+    x: int
+    y: int
+    
     button: Button
-    release: bool
-    
-    moving: bool
-    
     wheel_up: bool
     wheel_down: bool
+    
+    release: bool
+    moving: bool
     
     shift: bool
     ctrl: bool
     alt: bool
-    
-    x: int
-    y: int
-    
-    raw: bytes
     
     REGEX: ClassVar[Pattern] = compile(r"^\x1b\[<(\d+);(\d+);(\d+)([mM])$")
     SHIFT_MASK: ClassVar[int] = 4
@@ -172,6 +235,27 @@ class MouseInput:
 class InputEvent:
     """
     Timestamped union of keyboard or mouse input.
+    
+    Attributes:
+        input (KeyboardInput | MouseInput): The actual input event.
+        timestamp (float): The timestamp of when the event was parsed, 
+            in seconds since an arbitrary point in time (e.g. since the
+            program started). It is recommended to use `time.monotonic()` 
+            for this timestamp to avoid issues
+            
+    Examples:
+    ```python
+    with TermIOHub() as iohub:
+        match iohub.get_input():
+            case InputEvent(input=KeyboardInput(raw=b'Q') 
+                            | constants.PredefinedKeys.C_CTRL.value 
+                            as kb_input):
+                ...
+            case InputEvent(input=MouseInput(button=MouseInput.Button.LEFT) as ms_input):
+                ...
+            case InputEvent(input=MouseInput(moving=True)):
+                ...
+    ```
     """
     input: KeyboardInput | MouseInput
     timestamp: float

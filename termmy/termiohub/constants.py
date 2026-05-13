@@ -8,7 +8,14 @@ _F = KeyboardInput.ModifierState.NO
 _U = KeyboardInput.ModifierState.UNKNOWN
 
 class PredefinedKeys(Enum):
-    """Collection of predefined keyboard inputs."""
+    """
+    An enum of predefined keyboard inputs.
+    
+    Note that since this class is an Enum, the members are not the actual
+    `KeyboardInput` objects, but rather enum members. 
+    For example, instead of using `PredefinedKeys.C_CTRL`, you should use 
+    `PredefinedKeys.C_CTRL.value` to get the actual `KeyboardInput` object.
+    """
     
     # Blow I used a few `if True:` in order to fold them as groups in vscode
     
@@ -417,17 +424,38 @@ class PredefinedKeys(Enum):
 # Out
 ################################################################
 
-KEY_MAPPING = {k.value.raw: k.value for k in PredefinedKeys}
+_KEY_MAPPING = {k.value.raw: k.value for k in PredefinedKeys}
 
-_DFA_KEYBOARD = State.accepts(KEY_MAPPING.keys())
+def get_default_keyboard_dfa() -> State:
+    """
+    Return the default DFA for keyboard input. The returned value is created
+    every time this function is called so it is safe to modify the returned
+    value.
+    """
+    dfa = State.accepts(_KEY_MAPPING.keys())
+    return dfa
 
-_DFA_MOUSE = State.from_constructor_list(
-    [b"\x1b[<", State.numbers, b";", State.numbers, b";", State.numbers],
-    is_final=False,
-)
-_DFA_MOUSE.multi_transit_(b"\x1b[<0;0;0").link(ord('m'), 
-                                              State({}, is_final=True))
-_DFA_MOUSE.multi_transit_(b"\x1b[<0;0;0").link(ord('M'), 
-                                              State({}, is_final=True))
+def get_default_mouse_dfa() -> State:
+    """
+    Return the default DFA for mouse input. The returned value is created every
+    time this function is called so it is safe to modify the returned value.
+    """
+    dfa = State.from_constructor_list(
+        [b"\x1b[<", State.numbers, b";", State.numbers, b";", State.numbers],
+        is_final=False,
+    )
+    dfa.multi_transit_(b"\x1b[<0;0;0").link(ord('m'), 
+                                                State({}, is_final=True))
+    dfa.multi_transit_(b"\x1b[<0;0;0").link(ord('M'), 
+                                                State({}, is_final=True))
+    return dfa
 
-DFA = State.merge(_DFA_KEYBOARD, _DFA_MOUSE)
+_DFA_KEYBOARD = get_default_keyboard_dfa()
+_DFA_MOUSE = get_default_mouse_dfa()
+
+def get_default_dfa():
+    """
+    Return the default DFA. The returned value is created every time this
+    function is called so it is safe to modify the returned value.
+    """
+    return State.merge(_DFA_KEYBOARD, _DFA_MOUSE)
